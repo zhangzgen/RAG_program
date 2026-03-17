@@ -245,7 +245,8 @@ class VectorStore:
             list: 切片列表，每个切片包含 text, parent_content, parent_id 等信息
         """
         try:
-            filter_expr = f'file_path == "{file_path}"'
+            escaped_path = file_path.replace('\\', '\\\\')
+            filter_expr = f'file_path == "{escaped_path}"'
             results = self.client.query(
                 collection_name=self.collection_name,
                 filter=filter_expr,
