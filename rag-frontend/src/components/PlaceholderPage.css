@@ -1,0 +1,35 @@
+.placeholder-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  min-height: 100%;
+}
+
+.placeholder-content {
+  text-align: center;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  max-width: 320px;
+}
+
+.placeholder-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.placeholder-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.placeholder-description {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
