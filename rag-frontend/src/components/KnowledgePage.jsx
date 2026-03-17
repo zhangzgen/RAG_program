@@ -60,6 +60,7 @@ const KnowledgePage = () => {
   const [chunksLoading, setChunksLoading] = useState(false);
   const [fileChunks, setFileChunks] = useState([]);
   const [chunksFileName, setChunksFileName] = useState('');
+  const [expandedChunk, setExpandedChunk] = useState(null);
 
   useEffect(() => {
     loadCategories();
@@ -173,6 +174,7 @@ const KnowledgePage = () => {
     try {
       setChunksLoading(true);
       setChunksFileName(file.name);
+      setExpandedChunk(null);
       setShowChunksModal(true);
       const data = await getFileChunks(file.id);
       setFileChunks(data.chunks || []);
@@ -778,26 +780,58 @@ const KnowledgePage = () => {
               ) : fileChunks.length === 0 ? (
                 <div className="chunks-empty">暂无切片数据</div>
               ) : (
-                <div className="chunks-list">
-                  {fileChunks.map((chunk, index) => (
-                    <div key={index} className="chunk-item">
-                      <div className="chunk-header">
-                        <span className="chunk-index">切片 #{index + 1}</span>
-                        <span className="chunk-parent-id" title={chunk.parent_id}>ID: {chunk.parent_id ? chunk.parent_id.substring(0, 12) + '...' : 'N/A'}</span>
-                      </div>
-                      <div className="chunk-text">
-                        {chunk.text.length > 200 ? chunk.text.substring(0, 200) + '...' : chunk.text}
-                      </div>
-                      {chunk.parent_content && (
-                        <div className="chunk-parent">
-                          <div className="parent-label">父文档:</div>
-                          <div className="parent-text">
-                            {chunk.parent_content.length > 150 ? chunk.parent_content.substring(0, 150) + '...' : chunk.parent_content}
-                          </div>
+                <div className="chunks-results-list">
+                  <div className="results-header">
+                    <span className="results-count">{fileChunks.length} 个切片</span>
+                  </div>
+                  <div className="results-list">
+                    {fileChunks.map((chunk, index) => (
+                      <div 
+                        key={index} 
+                        className={`vector-result-item ${expandedChunk === index ? 'expanded' : ''}`}
+                        onClick={() => setExpandedChunk(expandedChunk === index ? null : index)}
+                      >
+                        <div className="result-header">
+                          <span className="result-index">#{index + 1}</span>
+                          <span className="result-source">{chunk.source || '未知来源'}</span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="result-content">
+                          {expandedChunk === index 
+                            ? chunk.text 
+                            : chunk.text.length > 100 
+                              ? chunk.text.substring(0, 100) + '...' 
+                              : chunk.text
+                          }
+                        </div>
+                        {expandedChunk === index && (
+                          <>
+                            {chunk.parent_content && (
+                              <div className="result-parent">
+                                <div className="parent-label">父文档：</div>
+                                <div className="parent-content">{chunk.parent_content}</div>
+                              </div>
+                            )}
+                            {chunk.file_path && (
+                              <div className="result-trace">
+                                <button 
+                                  className="trace-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTraceSource(chunk.file_path);
+                                  }}
+                                >
+                                  📂 查看源文件
+                                </button>
+                                <span className="file-path-hint" title={chunk.file_path}>
+                                  {chunk.file_path.split('/').pop().split('\\').pop()}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
