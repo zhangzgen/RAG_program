@@ -233,6 +233,43 @@ class VectorStore:
 
         return ranked_results[:conf.CANDIDATE_M]
 
+    def get_chunks_by_file_path(self, file_path, limit=100):
+        """
+        根据文件路径查询该文件的所有切片
+        
+        Args:
+            file_path: 文件路径
+            limit: 返回的最大切片数量
+            
+        Returns:
+            list: 切片列表，每个切片包含 text, parent_content, parent_id 等信息
+        """
+        try:
+            filter_expr = f'file_path == "{file_path}"'
+            results = self.client.query(
+                collection_name=self.collection_name,
+                filter=filter_expr,
+                output_fields=["text", "parent_id", "parent_content", "source", "timestamp", "file_path"],
+                limit=limit
+            )
+            
+            chunks = []
+            for hit in results:
+                chunks.append({
+                    'text': hit.get('text', ''),
+                    'parent_id': hit.get('parent_id', ''),
+                    'parent_content': hit.get('parent_content', ''),
+                    'source': hit.get('source', ''),
+                    'timestamp': hit.get('timestamp', ''),
+                    'file_path': hit.get('file_path', ''),
+                })
+            
+            self.logger.info(f'文件 {file_path} 查询到 {len(chunks)} 个切片')
+            return chunks
+        except Exception as e:
+            self.logger.error(f'查询文件切片失败: {e}')
+            return []
+
     def _doc_from_hit(self, hit):
         return Document(
             page_content=hit.get("text"),

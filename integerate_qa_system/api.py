@@ -1107,6 +1107,50 @@ async def get_unchunked_files(category_id: Optional[int] = None, user: dict = De
         raise HTTPException(status_code=500, detail=f"获取未切片文件失败: {str(e)}")
 
 
+@app.get("/knowledge/files/{file_id}/chunks")
+async def get_file_chunks(file_id: int, user: dict = Depends(get_current_user)):
+    """
+    获取文件的所有切片内容
+    """
+    try:
+        file_info = qa_system.mysql_client.get_file_by_id(file_id)
+        if not file_info:
+            raise HTTPException(status_code=404, detail="文件不存在")
+        
+        if not file_info['is_chunk']:
+            return {
+                'file_id': file_id,
+                'file_path': file_info['file_path'],
+                'is_chunk': False,
+                'total': 0,
+                'chunks': []
+            }
+        
+        file_path = file_info['file_path']
+        chunks = qa_system.vector_store.get_chunks_by_file_path(file_path)
+        
+        unique_chunks = []
+        seen_parent_ids = set()
+        for chunk in chunks:
+            parent_id = chunk.get('parent_id', '')
+            if parent_id not in seen_parent_ids:
+                unique_chunks.append(chunk)
+                seen_parent_ids.add(parent_id)
+        
+        return {
+            'file_id': file_id,
+            'file_path': file_path,
+            'is_chunk': True,
+            'total': len(unique_chunks),
+            'chunks': unique_chunks
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"获取文件切片失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取文件切片失败: {str(e)}")
+
+
 @app.get("/knowledge/supported-types")
 async def get_supported_file_types():
     """

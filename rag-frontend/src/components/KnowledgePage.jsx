@@ -9,7 +9,8 @@ import {
   vectorSearch,
   getKnowledgeSources,
   chunkFilesPost,
-  getSupportedFileTypes
+  getSupportedFileTypes,
+  getFileChunks
 } from '../api';
 import FilePreview from './FilePreview';
 import './KnowledgePage.css';
@@ -54,6 +55,11 @@ const KnowledgePage = () => {
   const [chunkProgress, setChunkProgress] = useState(null);
   const [chunkResults, setChunkResults] = useState([]);
   const [supportedExtensions, setSupportedExtensions] = useState(DEFAULT_SUPPORTED_EXTENSIONS);
+  
+  const [showChunksModal, setShowChunksModal] = useState(false);
+  const [chunksLoading, setChunksLoading] = useState(false);
+  const [fileChunks, setFileChunks] = useState([]);
+  const [chunksFileName, setChunksFileName] = useState('');
 
   useEffect(() => {
     loadCategories();
@@ -156,6 +162,25 @@ const KnowledgePage = () => {
       alert(error.message || '溯源文件预览失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewChunks = async (file) => {
+    if (!file.is_chunk) {
+      alert('该文件尚未切片');
+      return;
+    }
+    try {
+      setChunksLoading(true);
+      setChunksFileName(file.name);
+      setShowChunksModal(true);
+      const data = await getFileChunks(file.id);
+      setFileChunks(data.chunks || []);
+    } catch (error) {
+      alert(error.message || '获取切片失败');
+      setShowChunksModal(false);
+    } finally {
+      setChunksLoading(false);
     }
   };
 
@@ -627,8 +652,29 @@ const KnowledgePage = () => {
                       )}
                     </div>
                     <div className="file-col actions">
-                      {!file.is_dir && (
-                        <span className="action-hint">点击预览</span>
+                      {!file.is_dir && !file.is_chunk && supportedExtensions.includes(file.file_type) && (
+                        <button 
+                          className="chunk-action-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFilePreview(file);
+                          }}
+                          title="预览文件"
+                        >
+                          👁️
+                        </button>
+                      )}
+                      {!file.is_dir && file.is_chunk && (
+                        <button 
+                          className="chunk-action-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewChunks(file);
+                          }}
+                          title="查看切片"
+                        >
+                          📄
+                        </button>
                       )}
                       {file.is_dir && file.category_id && (
                         <span className="action-hint">点击进入</span>
@@ -715,6 +761,50 @@ const KnowledgePage = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showChunksModal && (
+        <div className="modal-overlay" onClick={() => setShowChunksModal(false)}>
+          <div className="modal-content chunks-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="chunks-modal-header">
+              <h4>📄 {chunksFileName} - 切片列表</h4>
+              <button className="close-btn" onClick={() => setShowChunksModal(false)}>×</button>
+            </div>
+            <div className="chunks-modal-body">
+              {chunksLoading ? (
+                <div className="chunks-loading">加载中...</div>
+              ) : fileChunks.length === 0 ? (
+                <div className="chunks-empty">暂无切片数据</div>
+              ) : (
+                <div className="chunks-list">
+                  {fileChunks.map((chunk, index) => (
+                    <div key={index} className="chunk-item">
+                      <div className="chunk-header">
+                        <span className="chunk-index">切片 #{index + 1}</span>
+                        <span className="chunk-parent-id" title={chunk.parent_id}>ID: {chunk.parent_id ? chunk.parent_id.substring(0, 12) + '...' : 'N/A'}</span>
+                      </div>
+                      <div className="chunk-text">
+                        {chunk.text.length > 200 ? chunk.text.substring(0, 200) + '...' : chunk.text}
+                      </div>
+                      {chunk.parent_content && (
+                        <div className="chunk-parent">
+                          <div className="parent-label">父文档:</div>
+                          <div className="parent-text">
+                            {chunk.parent_content.length > 150 ? chunk.parent_content.substring(0, 150) + '...' : chunk.parent_content}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="chunks-modal-footer">
+              <span className="chunks-count">共 {fileChunks.length} 个切片</span>
+              <button className="primary" onClick={() => setShowChunksModal(false)}>关闭</button>
+            </div>
           </div>
         </div>
       )}

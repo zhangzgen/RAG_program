@@ -976,3 +976,145 @@
 .chunk-result-item.failed .result-status {
   color: #dc2626;
 }
+
+.chunk-action-btn {
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.chunk-action-btn:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.chunks-modal {
+  width: 600px;
+  max-width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chunks-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.chunks-modal-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+.chunks-modal-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.chunks-modal-header .close-btn:hover {
+  color: #374151;
+}
+
+.chunks-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+  min-height: 200px;
+}
+
+.chunks-loading,
+.chunks-empty {
+  text-align: center;
+  padding: 40px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.chunks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chunk-item {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.chunk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.chunk-index {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5534DA;
+}
+
+.chunk-parent-id {
+  font-size: 10px;
+  color: #9ca3af;
+  font-family: monospace;
+}
+
+.chunk-text {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.5;
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+.chunk-parent {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.chunk-parent .parent-label {
+  font-size: 10px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.chunk-parent .parent-text {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.4;
+  background: #fffbeb;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.chunks-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.chunks-count {
+  font-size: 12px;
+  color: #6b7280;
+}

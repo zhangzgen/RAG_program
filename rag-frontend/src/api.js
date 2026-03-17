@@ -312,3 +312,8 @@ export const getSupportedFileTypes = async () => {
   const response = await api.get('/knowledge/supported-types');
   return response.data;
 };
+
+export const getFileChunks = async (fileId) => {
+  const response = await api.get(`/knowledge/files/${fileId}/chunks`);
+  return response.data;
+};
