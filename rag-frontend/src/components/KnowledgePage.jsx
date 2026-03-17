@@ -134,6 +134,31 @@ const KnowledgePage = () => {
     }
   };
 
+  const handleTraceSource = async (filePath) => {
+    if (!filePath) {
+      alert('文件路径不存在');
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await previewFileByPath(filePath);
+      setPreviewFile({
+        file_name: data.file_name || filePath.split('/').pop().split('\\').pop(),
+        content: data.content,
+        file_type: data.file_type,
+        file_ext: data.file_ext,
+        mime_type: data.mime_type,
+        file_size: data.file_size,
+        path: filePath
+      });
+      setShowPreview(true);
+    } catch (error) {
+      alert(error.message || '溯源文件预览失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUploadFile = async () => {
     if (!uploadingFile || !currentCategoryId) {
       alert('请选择文件');
@@ -439,11 +464,31 @@ const KnowledgePage = () => {
                           : result.content
                       }
                     </div>
-                    {expandedResult === result.id && result.parent_content && (
-                      <div className="result-parent">
-                        <div className="parent-label">父文档：</div>
-                        <div className="parent-content">{result.parent_content}</div>
-                      </div>
+                    {expandedResult === result.id && (
+                      <>
+                        {result.parent_content && (
+                          <div className="result-parent">
+                            <div className="parent-label">父文档：</div>
+                            <div className="parent-content">{result.parent_content}</div>
+                          </div>
+                        )}
+                        {result.file_path && (
+                          <div className="result-trace">
+                            <button 
+                              className="trace-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTraceSource(result.file_path);
+                              }}
+                            >
+                              📂 查看源文件
+                            </button>
+                            <span className="file-path-hint" title={result.file_path}>
+                              {result.file_path.split('/').pop().split('\\').pop()}
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
