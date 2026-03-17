@@ -466,9 +466,11 @@ const KnowledgePage = () => {
                 {chunking ? '切片中...' : `切片选中 (${selectedFiles.length})`}
               </button>
             )}
-            <button className="action-btn" onClick={() => setShowCreateModal(true)}>
-              + 新建分类
-            </button>
+            {!currentCategoryId && (
+              <button className="action-btn" onClick={() => setShowCreateModal(true)}>
+                + 新建分类
+              </button>
+            )}
             {currentCategoryId && (
               <button className="action-btn primary" onClick={() => setShowUploadModal(true)}>
                 上传文件

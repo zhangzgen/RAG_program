@@ -885,10 +885,11 @@ async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_c
             search_results.append({
                 'id': i + 1,
                 'content': doc.page_content,
+                'parent_content': doc.metadata.get('parent_content', ''),
                 'source': doc.metadata.get('source', 'unknown'),
                 'timestamp': doc.metadata.get('timestamp', ''),
+                'file_path': doc.metadata.get('file_path', ''),
                 'parent_id': doc.metadata.get('parent_id', ''),
-                'parent_content': doc.metadata.get('parent_content', '')[:500] + '...' if doc.metadata.get('parent_content') and len(doc.metadata.get('parent_content', '')) > 500 else doc.metadata.get('parent_content', '')
             })
         
         return {

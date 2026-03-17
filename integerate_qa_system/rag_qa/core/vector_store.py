@@ -86,6 +86,7 @@ class VectorStore:
             scheme.add_field(field_name='source', datatype=DataType.VARCHAR, max_length=50)
             # 添加时间戳字段, VARCHAR类型, 最大长度50
             scheme.add_field(field_name='timestamp', datatype=DataType.VARCHAR, max_length=50)
+            scheme.add_field(field_name='file_path', datatype=DataType.VARCHAR, max_length=500)
 
             # 创建索引参数对象
             index_params = self.client.prepare_index_params()
@@ -112,8 +113,8 @@ class VectorStore:
                                           index_params=index_params)
             # 记录创建集合的日志
             self.logger.info(f'已创建集合: {self.collection_name}')
-            documents = process_documents(r"D:\Document\PythonProjects\Edu_RAG_QA\integerate_qa_system\data")
-            self.add_documents(documents)
+            # documents = process_documents(r"D:\Document\PythonProjects\Edu_RAG_QA\integerate_qa_system\data")
+            # self.add_documents(documents)
         # 如果集合不存在
         else:
             # 记录加载集合的日志
@@ -153,6 +154,7 @@ class VectorStore:
                 'parent_content': doc.metadata['parent_content'],
                 'source': doc.metadata.get('source', 'unknown'),
                 'timestamp': doc.metadata.get('timestamp', 'unknown'),
+                'file_path': doc.metadata.get('file_path', ''),
             })
             # 检查是否有数据需要插入
         if data:
@@ -206,61 +208,40 @@ class VectorStore:
             reqs=[dense_request, sparse_request],
             ranker=ranker,
             limit=k,
-            output_fields=["text", "parent_id", "parent_content", "source", "timestamp"]
+            output_fields=["text", "parent_id", "parent_content", "source", "timestamp", "file_path"]
         )[0]
 
-        # 将搜索结果转换为 Document 对象列表
         sub_chunks = [self._doc_from_hit(hit["entity"]) for hit in results]
-        # print(f'sub_chunks-->{len(sub_chunks)}')
-        # 从子块中提取去重的父文档
-        parent_docs = self._get_unique_parent_docs(sub_chunks)
-        # 如果只有1个文档，直接返回跳过重排序
-        if len(parent_docs) < 2:
-            return parent_docs[:conf.CANDIDATE_M]
-            # 如果有父文档，进行重排序
-        if parent_docs:
-            # 创建查询与文档内容的配对列表
-            pairs = [[query, doc.page_content] for doc in parent_docs]
-            # 使用 BGE-Reranker 计算每个配对的得分
-            scores = self.reranker.predict(pairs)
-            # 根据得分从高到低排序文档
-            ranked_parent_docs = [doc for _, doc in sorted(zip(scores, parent_docs), reverse=True)]
-        # 如果没有父文档，返回空列表
-        else:
-            ranked_parent_docs = []
-
-        # 返回前 k 个重排序后的文档
-        return ranked_parent_docs[:conf.CANDIDATE_M]
-
-    # 定义私有方法，从子块中提取去重的父文档
-    def _get_unique_parent_docs(self, sub_chunks):
-        # 初始化集合，用于存储已处理的父块内容（去重）
-        parent_contents = set()
-        # 初始化列表，用于存储唯一父文档
-        unique_docs = []
-        # 遍历所有子块
+        
+        unique_results = []
+        seen_parent_ids = set()
         for chunk in sub_chunks:
-            # 获取子块的父块内容，默认为子块内容
-            parent_content = chunk.metadata.get("parent_content", chunk.page_content)
-            # 检查父块内容是否非空且未重复
-            if parent_content and parent_content not in parent_contents:
-                # 创建新的 Document 对象，包含父块内容和元数据
-                unique_docs.append(Document(page_content=parent_content, metadata=chunk.metadata))
-                # 将父块内容添加到去重集合
-                parent_contents.add(parent_content)
-        # 返回去重后的父文档列表
-        return unique_docs
+            parent_id = chunk.metadata.get("parent_id")
+            if parent_id and parent_id not in seen_parent_ids:
+                unique_results.append(chunk)
+                seen_parent_ids.add(parent_id)
+        
+        if len(unique_results) < 2:
+            return unique_results[:conf.CANDIDATE_M]
+        
+        if unique_results:
+            pairs = [[query, doc.page_content] for doc in unique_results]
+            scores = self.reranker.predict(pairs)
+            ranked_results = [doc for _, doc in sorted(zip(scores, unique_results), reverse=True)]
+        else:
+            ranked_results = []
 
-    # 定义私有方法，从 Milvus 查询结果创建 Document 对象
+        return ranked_results[:conf.CANDIDATE_M]
+
     def _doc_from_hit(self, hit):
-        # 创建并返回 Document 对象，填充内容和元数据
         return Document(
             page_content=hit.get("text"),
             metadata={
                 "parent_id": hit.get("parent_id"),
                 "parent_content": hit.get("parent_content"),
                 "source": hit.get("source"),
-                "timestamp": hit.get("timestamp")
+                "timestamp": hit.get("timestamp"),
+                "file_path": hit.get("file_path"),
             }
         )
 

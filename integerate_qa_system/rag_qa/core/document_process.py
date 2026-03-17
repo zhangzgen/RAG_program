@@ -135,6 +135,7 @@ def process_single_file(file_path, source='unknown', parent_chunk_size=None,
                 child_chunk.metadata['parent_content'] = parent_doc.page_content
                 child_chunk.metadata['id'] = f'{parent_id}_child_{k}'
                 child_chunk.metadata['source'] = source
+                child_chunk.metadata['file_path'] = file_path
                 child_chunks.append(child_chunk)
     
     logger.info(f'文件 {file_path} 生成子块数量: {len(child_chunks)}')
