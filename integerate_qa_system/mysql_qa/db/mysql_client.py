@@ -444,7 +444,7 @@ class MysqlClient(object):
 
     def get_files_by_category(self, category_id):
         """
-        获取指定分类下的所有文件和文件夹
+        获取指定分类下的所有文件和文件夹（排除分类文件夹本身）
         
         Args:
             category_id: 分类ID
@@ -453,6 +453,10 @@ class MysqlClient(object):
             list: 文件列表
         """
         try:
+            category = self.get_category_by_id(category_id)
+            if not category:
+                return []
+            
             self.cursor.execute('''
                 SELECT id, file_path, is_dir, is_chunk, category_id 
                 FROM file_info 
@@ -460,13 +464,28 @@ class MysqlClient(object):
                 ORDER BY is_dir DESC, file_path ASC
             ''', (category_id,))
             files = self.cursor.fetchall()
-            return [{
-                'id': f[0],
-                'file_path': f[1],
-                'is_dir': bool(f[2]),
-                'is_chunk': bool(f[3]),
-                'category_id': f[4]
-            } for f in files]
+            
+            category_folder_path = None
+            for f in files:
+                if f[2] == 1:
+                    file_name = os.path.basename(f[1])
+                    if file_name == category['category']:
+                        category_folder_path = f[1]
+                        break
+            
+            result = []
+            for f in files:
+                if category_folder_path and f[1] == category_folder_path:
+                    continue
+                result.append({
+                    'id': f[0],
+                    'file_path': f[1],
+                    'is_dir': bool(f[2]),
+                    'is_chunk': bool(f[3]),
+                    'category_id': f[4]
+                })
+            
+            return result
         except Exception as e:
             logger.error(f'获取文件列表失败: {e}')
             return []
