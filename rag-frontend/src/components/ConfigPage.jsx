@@ -20,6 +20,8 @@ const ConfigPage = () => {
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [hotReloadResult, setHotReloadResult] = useState(null);
+  const [showReloadModal, setShowReloadModal] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -134,15 +136,22 @@ const ConfigPage = () => {
       setLoading(true);
       const newContent = formToIni(formData);
       
-      await updateConfig({
+      const result = await updateConfig({
         config_content: newContent,
         change_description: changeDescription,
         changed_by: 'admin'
       });
-      showMessage('success', '配置保存成功');
+      
       setChangeDescription('');
       loadVersions();
-      loadConfig();
+      
+      if (result.hot_reload) {
+        setHotReloadResult(result.hot_reload);
+        setShowReloadModal(true);
+      } else {
+        showMessage('success', '配置保存成功');
+        loadConfig();
+      }
     } catch (error) {
       showMessage('error', '保存配置失败: ' + error.message);
     } finally {
@@ -167,16 +176,29 @@ const ConfigPage = () => {
     
     try {
       setLoading(true);
-      await rollbackConfig(versionId);
-      showMessage('success', '配置回退成功');
-      loadConfig();
+      const result = await rollbackConfig(versionId);
+      
       loadVersions();
+      
+      if (result.hot_reload) {
+        setHotReloadResult(result.hot_reload);
+        setShowReloadModal(true);
+      } else {
+        showMessage('success', result.message || '配置回退成功');
+        loadConfig();
+      }
+      
       setShowVersionModal(false);
     } catch (error) {
       showMessage('error', '配置回退失败: ' + error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReloadModalClose = () => {
+    setShowReloadModal(false);
+    loadConfig();
   };
 
   const renderConfigSection = (title, data, icon) => (
@@ -296,9 +318,14 @@ const ConfigPage = () => {
       title: 'LLM 配置',
       icon: '🤖',
       fields: [
-        { key: 'model', label: '模型名称', type: 'text', required: true, placeholder: 'qwen-plus' },
-        { key: 'dashscope_api_key', label: 'API Key', type: 'password', required: true },
-        { key: 'dashscope_base_url', label: 'API 地址', type: 'text', required: true, placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1' }
+        { key: 'model', label: '模型名称', type: 'text', required: true, placeholder: 'qwen-plus', hint: '支持: qwen-plus, deepseek-chat, deepseek-reasoner等' },
+        { key: 'api_key', label: 'API Key', type: 'password', required: true, hint: '各平台API密钥' },
+        { key: 'base_url', label: 'API 地址', type: 'text', required: true, placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hint: 'OpenAI兼容的API地址' },
+        { key: 'enable_thinking', label: '启用思考模式', type: 'select', required: false, options: [
+          { value: 'true', label: '启用' },
+          { value: 'false', label: '禁用' }
+        ], hint: '思考模型会输出推理过程' },
+        { key: 'thinking_budget_tokens', label: '思考预算Token', type: 'number', required: false, placeholder: '10000', hint: '思考过程的最大token数' }
       ]
     },
     {
@@ -360,13 +387,13 @@ const ConfigPage = () => {
         <div className="config-tabs">
           <button 
             className={`tab-btn ${activeTab === 'view' ? 'active' : ''}`}
-            onClick={() => setActiveTab('view')}
+            onClick={() => { setActiveTab('view'); loadConfig(); }}
           >
             配置查看
           </button>
           <button 
             className={`tab-btn ${activeTab === 'edit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('edit')}
+            onClick={() => { setActiveTab('edit'); loadConfig(); }}
           >
             配置编辑
           </button>
@@ -507,6 +534,49 @@ const ConfigPage = () => {
               )}
               <button className="close-modal-btn" onClick={() => setShowVersionModal(false)}>
                 关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReloadModal && hotReloadResult && (
+        <div className="modal-overlay" onClick={handleReloadModalClose}>
+          <div className="reload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h4>⚙️ 配置热加载结果</h4>
+              <button className="close-btn" onClick={handleReloadModalClose}>×</button>
+            </div>
+            <div className="modal-body">
+              {hotReloadResult.messages && hotReloadResult.messages.map((msg, index) => (
+                <div key={index} className={`reload-message ${index === 0 ? 'success' : 'warning'}`}>
+                  {index === 0 ? '✅' : '⚠️'} {msg}
+                </div>
+              ))}
+              
+              <div className="reload-details">
+                <div className="detail-section">
+                  <h5>✅ 热加载成功 ({hotReloadResult.reloaded_count}项)</h5>
+                  <div className="detail-list">
+                    {hotReloadResult.reloaded.map((item, index) => (
+                      <span key={index} className="detail-item success">{item}</span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="detail-section">
+                  <h5>⚠️ 需要重启 ({hotReloadResult.not_reloaded_count}项)</h5>
+                  <div className="detail-list">
+                    {hotReloadResult.not_reloaded.map((item, index) => (
+                      <span key={index} className="detail-item warning">{item}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="primary" onClick={handleReloadModalClose}>
+                我知道了
               </button>
             </div>
           </div>

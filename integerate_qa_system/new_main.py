@@ -26,21 +26,39 @@ class IntegratedQASystem:
         self.redis_client = RedisClient()
         # 初始化 BM25 搜索模块，结合 MySQL 和 Redis
         self.bm25_search = BM25Search(redis_client=self.redis_client, mysql_client=self.mysql_client)
-        try:
-            # 初始化 OpenAI 客户端，连接 DashScope API
-            self.client = OpenAI(api_key=self.config.DASHSCOPE_API_KEY,
-                                 base_url=self.config.DASHSCOPE_BASE_URL)
-        except Exception as e:
-            # 记录 OpenAI 初始化失败的错误日志
-            self.logger.error(f"OpenAI 客户端初始化失败: {e}")
-            # 抛出异常，终止初始化
-            raise
+        # 初始化 OpenAI 客户端
+        self._init_llm_client()
         # 初始化向量存储，用于 RAG 系统的知识库管理
         self.vector_store = VectorStore()
         # 初始化 RAG 系统，传入向量存储和 DashScope API 调用函数
         self.rag_system = RAGSystem(self.vector_store, self.call_dashscope)
         # 初始化数据库表结构，用于存储用户、会话和对话记录
         self.init_database_tables()
+
+    def _init_llm_client(self):
+        """初始化LLM客户端"""
+        try:
+            api_key = self.config.LLM_API_KEY or self.config.DASHSCOPE_API_KEY
+            base_url = self.config.LLM_BASE_URL or self.config.DASHSCOPE_BASE_URL
+            
+            if not api_key:
+                raise ValueError("LLM API Key 未配置")
+            
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.logger.info(f"LLM客户端初始化成功: model={self.config.LLM_MODEL}, base_url={base_url}")
+        except Exception as e:
+            self.logger.error(f"LLM客户端初始化失败: {e}")
+            raise
+
+    def reload_llm_client(self):
+        """热加载LLM客户端"""
+        try:
+            self._init_llm_client()
+            self.logger.info("LLM客户端热加载成功")
+            return True
+        except Exception as e:
+            self.logger.error(f"LLM客户端热加载失败: {e}")
+            return False
 
     def init_database_tables(self):
         """初始化MySQL中的user、user_session和conversations表"""
@@ -56,36 +74,50 @@ class IntegratedQASystem:
             raise
 
     def call_dashscope(self, prompt):
-        """调用DashScope API生成答案（流式输出）"""
+        """调用LLM API生成答案（流式输出），支持思考模型"""
         try:
-            # 创建聊天完成请求，启用流式输出
-            completion = self.client.chat.completions.create(
-                model=self.config.LLM_MODEL,  # 使用配置中的语言模型
-                messages=[
-                    {"role": "system", "content": "你是一个有用的助手。"},  # 系统提示
-                    {"role": "user", "content": prompt},  # 用户输入的提示
+            from base.config import Config
+            current_config = Config()
+            
+            api_key = current_config.LLM_API_KEY or current_config.DASHSCOPE_API_KEY
+            base_url = current_config.LLM_BASE_URL or current_config.DASHSCOPE_BASE_URL
+            model = current_config.LLM_MODEL
+            
+            self.logger.info(f"LLM调用配置: model={model}, base_url={base_url}")
+            
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            
+            is_thinking = current_config.is_thinking_model()
+            
+            request_params = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "你是一个有用的助手。"},
+                    {"role": "user", "content": prompt},
                 ],
-                timeout=30,  # 设置 30 秒超时
-                stream=True  # 启用流式输出
-            )
-            # 初始化收集流式输出的字符串
-            # collected_content = ""
-            # 遍历流式输出的每个 chunk
+                "timeout": 60,
+                "stream": True
+            }
+            
+            if is_thinking:
+                request_params["extra_body"] = {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": current_config.THINKING_BUDGET_TOKENS
+                    }
+                }
+                self.logger.info(f"使用思考模型: {model}")
+            
+            completion = client.chat.completions.create(**request_params)
+            
             for chunk in completion:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    # 获取当前 chunk 的内容
                     content = chunk.choices[0].delta.content
-                    # 累积内容
-                    # collected_content += content
-                    # 逐 token 返回，供前端实时显示
                     yield content
-            # 返回完整答案
-            # return collected_content
+                    
         except Exception as e:
-            # 记录 API 调用失败的错误日志
             self.logger.error(f"LLM调用失败: {e}")
-            # 返回错误信息
-            return f"错误：LLM调用失败 - {e}"
+            yield f"错误：LLM调用失败 - {e}"
 
     def _fetch_recent_history(self, session_id: str) -> list:
         """获取最近5轮对话历史"""

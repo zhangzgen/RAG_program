@@ -824,7 +824,7 @@ class MysqlClient(object):
 
     def rollback_config(self, version_id):
         """
-        回退到指定配置版本
+        回退到指定配置版本（不创建新版本）
         
         Args:
             version_id: 目标版本ID
@@ -834,7 +834,7 @@ class MysqlClient(object):
         """
         try:
             self.cursor.execute('''
-                SELECT id, version, config_content 
+                SELECT id, version, config_content, change_description
                 FROM config_version 
                 WHERE id = %s
             ''', (version_id,))
@@ -844,15 +844,19 @@ class MysqlClient(object):
                 logger.warning(f'配置版本不存在: version_id={version_id}')
                 return None
             
+            old_version = result[1]
+            config_content = result[2]
+            
             self.cursor.execute('UPDATE config_version SET is_active = 0')
             self.cursor.execute('UPDATE config_version SET is_active = 1 WHERE id = %s', (version_id,))
             self.connect.commit()
             
-            logger.info(f'配置回退成功: version_id={version_id}')
+            logger.info(f'配置回退成功: 回退到版本 {old_version}')
             return {
                 'id': result[0],
-                'version': result[1],
-                'config_content': result[2]
+                'version': old_version,
+                'config_content': config_content,
+                'original_version': old_version
             }
         except Exception as e:
             logger.error(f'配置回退失败: {e}')

@@ -1180,7 +1180,10 @@ async def get_config(user: dict = Depends(get_current_user)):
     """
     try:
         from base import Config
+        Config._config_cache = None
         config = Config()
+        if hasattr(config, '_force_reload'):
+            delattr(config, '_force_reload')
         
         config_data = {
             'mysql': {
@@ -1269,7 +1272,7 @@ class ConfigUpdateRequest(BaseModel):
 @app.post("/config")
 async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_current_user)):
     """
-    更新配置文件
+    更新配置文件并执行热加载
     """
     try:
         config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
@@ -1287,10 +1290,29 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
             changed_by=request.changed_by
         )
         
+        from base.config import Config
+        reload_result = Config.hot_reload()
+        
+        reloaded_items = reload_result['reloaded']
+        not_reloaded_items = reload_result['not_reloaded']
+        
+        reload_messages = []
+        if reloaded_items:
+            reload_messages.append(f"以下 {len(reloaded_items)} 项配置已热加载成功: {', '.join(reloaded_items[:5])}{'...' if len(reloaded_items) > 5 else ''}")
+        if not_reloaded_items:
+            reload_messages.append(f"以下 {len(not_reloaded_items)} 项配置需要重启后端服务才能生效: {', '.join(not_reloaded_items[:3])}{'...' if len(not_reloaded_items) > 3 else ''}")
+        
         return {
             'success': True,
             'message': '配置更新成功',
-            'version': version
+            'version': version,
+            'hot_reload': {
+                'reloaded': reloaded_items,
+                'not_reloaded': not_reloaded_items,
+                'reloaded_count': reload_result['reloaded_count'],
+                'not_reloaded_count': reload_result['not_reloaded_count'],
+                'messages': reload_messages
+            }
         }
     except Exception as e:
         qa_system.logger.error(f"更新配置失败: {e}")
@@ -1348,11 +1370,31 @@ async def rollback_config(version_id: int, user: dict = Depends(get_current_user
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(version['config_content'])
         
-        qa_system.mysql_client.rollback_config(version_id)
+        rollback_result = qa_system.mysql_client.rollback_config(version_id)
+        
+        from base.config import Config
+        reload_result = Config.hot_reload()
+        
+        reloaded_items = reload_result['reloaded']
+        not_reloaded_items = reload_result['not_reloaded']
+        
+        reload_messages = []
+        if reloaded_items:
+            reload_messages.append(f"以下 {len(reloaded_items)} 项配置已热加载成功")
+        if not_reloaded_items:
+            reload_messages.append(f"以下 {len(not_reloaded_items)} 项配置需要重启后端服务才能生效")
         
         return {
             'success': True,
-            'message': f'已回退到版本 {version["version"]}'
+            'message': f'已回退到版本 {rollback_result["original_version"]}',
+            'rollback_version': rollback_result['version'],
+            'hot_reload': {
+                'reloaded': reloaded_items,
+                'not_reloaded': not_reloaded_items,
+                'reloaded_count': reload_result['reloaded_count'],
+                'not_reloaded_count': reload_result['not_reloaded_count'],
+                'messages': reload_messages
+            }
         }
     except HTTPException:
         raise
