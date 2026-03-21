@@ -317,3 +317,33 @@ export const getFileChunks = async (fileId) => {
   const response = await api.get(`/knowledge/files/${fileId}/chunks`);
   return response.data;
 };
+
+export const getConfig = async () => {
+  const response = await api.get('/config');
+  return response.data;
+};
+
+export const getRawConfig = async () => {
+  const response = await api.get('/config/raw');
+  return response.data;
+};
+
+export const updateConfig = async (data) => {
+  const response = await api.post('/config', data);
+  return response.data;
+};
+
+export const getConfigVersions = async (limit = 20) => {
+  const response = await api.get('/config/versions', { params: { limit } });
+  return response.data;
+};
+
+export const getConfigVersionDetail = async (versionId) => {
+  const response = await api.get(`/config/versions/${versionId}`);
+  return response.data;
+};
+
+export const rollbackConfig = async (versionId) => {
+  const response = await api.post(`/config/rollback/${versionId}`);
+  return response.data;
+};

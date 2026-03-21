@@ -713,6 +713,184 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'Mysql数据库连接关闭失败: {e}')
 
+    def create_config_version_table(self):
+        """创建配置版本表"""
+        try:
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS config_version (
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '版本ID',
+                    version VARCHAR(50) NOT NULL COMMENT '版本号',
+                    config_content TEXT NOT NULL COMMENT '配置内容(JSON格式)',
+                    change_description VARCHAR(500) COMMENT '变更描述',
+                    changed_by VARCHAR(100) COMMENT '变更人',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    is_active TINYINT(1) DEFAULT 1 COMMENT '是否为当前活跃版本',
+                    INDEX idx_version (version),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配置版本表'
+            ''')
+            self.connect.commit()
+            logger.info('配置版本表创建成功')
+        except pymysql.MyQSLLError as e:
+            logger.error(f'配置版本表创建失败: {e}')
+            raise
+
+    def get_current_config(self):
+        """
+        获取当前配置内容
+        
+        Returns:
+            dict: 当前配置内容
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, version, config_content, created_at 
+                FROM config_version 
+                WHERE is_active = 1 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ''')
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'version': result[1],
+                    'config_content': result[2],
+                    'created_at': str(result[3])
+                }
+            return None
+        except Exception as e:
+            logger.error(f'获取当前配置失败: {e}')
+            return None
+
+    def get_config_versions(self, limit=20):
+        """
+        获取配置版本列表
+        
+        Args:
+            limit: 返回数量限制
+            
+        Returns:
+            list: 版本列表
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, version, change_description, changed_by, created_at, is_active
+                FROM config_version 
+                ORDER BY created_at DESC 
+                LIMIT %s
+            ''', (limit,))
+            results = self.cursor.fetchall()
+            return [{
+                'id': r[0],
+                'version': r[1],
+                'change_description': r[2],
+                'changed_by': r[3],
+                'created_at': str(r[4]),
+                'is_active': bool(r[5])
+            } for r in results]
+        except Exception as e:
+            logger.error(f'获取配置版本列表失败: {e}')
+            return []
+
+    def save_config_version(self, version, config_content, change_description='', changed_by='system'):
+        """
+        保存新的配置版本
+        
+        Args:
+            version: 版本号
+            config_content: 配置内容(JSON字符串)
+            change_description: 变更描述
+            changed_by: 变更人
+            
+        Returns:
+            int: 新版本ID
+        """
+        try:
+            self.cursor.execute('UPDATE config_version SET is_active = 0')
+            
+            self.cursor.execute('''
+                INSERT INTO config_version (version, config_content, change_description, changed_by, is_active)
+                VALUES (%s, %s, %s, %s, 1)
+            ''', (version, config_content, change_description, changed_by))
+            self.connect.commit()
+            version_id = self.cursor.lastrowid
+            logger.info(f'配置版本保存成功: version={version}')
+            return version_id
+        except Exception as e:
+            logger.error(f'保存配置版本失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def rollback_config(self, version_id):
+        """
+        回退到指定配置版本
+        
+        Args:
+            version_id: 目标版本ID
+            
+        Returns:
+            dict: 回退后的配置内容
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, version, config_content 
+                FROM config_version 
+                WHERE id = %s
+            ''', (version_id,))
+            result = self.cursor.fetchone()
+            
+            if not result:
+                logger.warning(f'配置版本不存在: version_id={version_id}')
+                return None
+            
+            self.cursor.execute('UPDATE config_version SET is_active = 0')
+            self.cursor.execute('UPDATE config_version SET is_active = 1 WHERE id = %s', (version_id,))
+            self.connect.commit()
+            
+            logger.info(f'配置回退成功: version_id={version_id}')
+            return {
+                'id': result[0],
+                'version': result[1],
+                'config_content': result[2]
+            }
+        except Exception as e:
+            logger.error(f'配置回退失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def get_config_by_id(self, version_id):
+        """
+        根据ID获取配置版本详情
+        
+        Args:
+            version_id: 版本ID
+            
+        Returns:
+            dict: 配置详情
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, version, config_content, change_description, changed_by, created_at, is_active
+                FROM config_version 
+                WHERE id = %s
+            ''', (version_id,))
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'version': result[1],
+                    'config_content': result[2],
+                    'change_description': result[3],
+                    'changed_by': result[4],
+                    'created_at': str(result[5]),
+                    'is_active': bool(result[6])
+                }
+            return None
+        except Exception as e:
+            logger.error(f'获取配置版本详情失败: {e}')
+            return None
+
 
 if __name__ == '__main__':
     mysql_client = MysqlClient()

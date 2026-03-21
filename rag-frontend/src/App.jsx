@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import SidebarModern from './components/SidebarModern';
 import ChatAreaModern from './components/ChatAreaModern';
 import KnowledgePage from './components/KnowledgePage';
+import ConfigPage from './components/ConfigPage';
 import PlaceholderPage from './components/PlaceholderPage';
 import Login from './components/Login';
 import { verifyToken } from './api';
@@ -186,7 +187,7 @@ function App() {
           professionalTab === 'knowledge' ? (
             <KnowledgePage />
           ) : professionalTab === 'config' ? (
-            <PlaceholderPage title="配置信息" description="配置信息页面正在开发中..." />
+            <ConfigPage />
           ) : (
             <PlaceholderPage title="Case分析" description="Case分析页面正在开发中..." />
           )
