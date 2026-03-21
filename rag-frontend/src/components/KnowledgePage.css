@@ -977,6 +977,29 @@
   color: #dc2626;
 }
 
+.chunk-complete-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.chunk-complete-btn {
+  padding: 10px 32px;
+  background: linear-gradient(135deg, #5534DA, #10b981);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chunk-complete-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(85, 52, 218, 0.3);
+}
+
 .chunk-action-btn {
   padding: 4px 8px;
   background: #f3f4f6;

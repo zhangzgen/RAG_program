@@ -54,6 +54,7 @@ const KnowledgePage = () => {
   const [chunking, setChunking] = useState(false);
   const [chunkProgress, setChunkProgress] = useState(null);
   const [chunkResults, setChunkResults] = useState([]);
+  const [chunkComplete, setChunkComplete] = useState(false);
   const [supportedExtensions, setSupportedExtensions] = useState(DEFAULT_SUPPORTED_EXTENSIONS);
   
   const [showChunksModal, setShowChunksModal] = useState(false);
@@ -317,6 +318,7 @@ const KnowledgePage = () => {
     setChunking(true);
     setChunkProgress({ current: 0, total: 0 });
     setChunkResults([]);
+    setChunkComplete(false);
     
     try {
       const categoryIds = [];
@@ -333,9 +335,10 @@ const KnowledgePage = () => {
       const processChunk = (data) => {
         if (data.type === 'start') {
           setChunkProgress({ current: 0, total: data.total });
-        } else if (data.type === 'progress') {
-          setChunkProgress({ current: data.current, total: data.total });
         } else if (data.type === 'result') {
+          if (data.completed !== undefined) {
+            setChunkProgress({ current: data.completed, total: data.total });
+          }
           setChunkResults(prev => [...prev, {
             file_id: data.file_id,
             file_name: data.file_name,
@@ -345,6 +348,7 @@ const KnowledgePage = () => {
           }]);
         } else if (data.type === 'complete') {
           setChunkProgress({ current: data.total, total: data.total });
+          setChunkComplete(true);
         }
       };
       
@@ -357,17 +361,21 @@ const KnowledgePage = () => {
       if (fileIds.length > 0) {
         await chunkFilesPost(fileIds, null, processChunk);
       }
-      
-      alert('切片处理完成');
-      setSelectedFiles([]);
-      await loadFiles(currentCategoryId);
     } catch (error) {
       console.error('切片失败:', error);
       alert(error.message || '切片失败');
-    } finally {
       setChunking(false);
       setChunkProgress(null);
     }
+  };
+
+  const closeChunkModal = () => {
+    setChunking(false);
+    setChunkProgress(null);
+    setChunkResults([]);
+    setChunkComplete(false);
+    setSelectedFiles([]);
+    loadFiles(currentCategoryId);
   };
 
   const closePreview = () => {
@@ -739,7 +747,7 @@ const KnowledgePage = () => {
       {chunking && (
         <div className="modal-overlay">
           <div className="modal-content chunk-progress-modal">
-            <h4>文件切片处理中...</h4>
+            <h4>{chunkComplete ? '切片处理完成' : '文件切片处理中...'}</h4>
             <div className="chunk-progress-container">
               <div className="chunk-progress-bar">
                 <div 
@@ -761,6 +769,13 @@ const KnowledgePage = () => {
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+            {chunkComplete && (
+              <div className="chunk-complete-actions">
+                <button className="chunk-complete-btn" onClick={closeChunkModal}>
+                  完成
+                </button>
               </div>
             )}
           </div>

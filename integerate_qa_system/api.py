@@ -1028,15 +1028,14 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_us
         
         total = len(files_to_chunk)
         results = []
+        completed = 0
         
-        yield f"data: {json.dumps({'type': 'start', 'total': total}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'start', 'total': total, 'completed': 0}, ensure_ascii=False)}\n\n"
         
         for i, file_info in enumerate(files_to_chunk):
             file_path = file_info['file_path']
             file_id = file_info['id']
             file_name = os.path.basename(file_path)
-            
-            yield f"data: {json.dumps({'type': 'progress', 'current': i + 1, 'total': total, 'file_name': file_name, 'status': 'processing'}, ensure_ascii=False)}\n\n"
             
             try:
                 category = qa_system.mysql_client.get_category_by_id(file_info['category_id'])
@@ -1045,13 +1044,14 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_us
                 child_chunks = process_single_file(file_path, source=source)
                 
                 if child_chunks is None or len(child_chunks) == 0:
+                    completed += 1
                     results.append({
                         'file_id': file_id,
                         'file_name': file_name,
                         'status': 'failed',
                         'error': '文件加载或切分失败，未生成任何切片'
                     })
-                    yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'failed', 'error': '文件加载或切分失败'}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'failed', 'error': '文件加载或切分失败', 'completed': completed, 'total': total}, ensure_ascii=False)}\n\n"
                     continue
                 
                 for chunk in child_chunks:
@@ -1061,23 +1061,25 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_us
                 
                 qa_system.mysql_client.update_file_chunk_status(file_id, True)
                 
+                completed += 1
                 results.append({
                     'file_id': file_id,
                     'file_name': file_name,
                     'status': 'success',
                     'chunks': len(child_chunks)
                 })
-                yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'success', 'chunks': len(child_chunks)}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'success', 'chunks': len(child_chunks), 'completed': completed, 'total': total}, ensure_ascii=False)}\n\n"
                 
             except Exception as e:
                 qa_system.logger.error(f"切片文件失败 {file_name}: {e}")
+                completed += 1
                 results.append({
                     'file_id': file_id,
                     'file_name': file_name,
                     'status': 'failed',
                     'error': str(e)
                 })
-                yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'failed', 'error': str(e)}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'result', 'file_id': file_id, 'file_name': file_name, 'status': 'failed', 'error': str(e), 'completed': completed, 'total': total}, ensure_ascii=False)}\n\n"
         
         success_count = sum(1 for r in results if r['status'] == 'success')
         yield f"data: {json.dumps({'type': 'complete', 'success': True, 'message': f'切片完成，成功 {success_count}/{total}', 'total': total, 'results': results}, ensure_ascii=False)}\n\n"
@@ -1129,20 +1131,12 @@ async def get_file_chunks(file_id: int, user: dict = Depends(get_current_user)):
         file_path = file_info['file_path']
         chunks = qa_system.vector_store.get_chunks_by_file_path(file_path)
         
-        unique_chunks = []
-        seen_parent_ids = set()
-        for chunk in chunks:
-            parent_id = chunk.get('parent_id', '')
-            if parent_id not in seen_parent_ids:
-                unique_chunks.append(chunk)
-                seen_parent_ids.add(parent_id)
-        
         return {
             'file_id': file_id,
             'file_path': file_path,
             'is_chunk': True,
-            'total': len(unique_chunks),
-            'chunks': unique_chunks
+            'total': len(chunks),
+            'chunks': chunks
         }
     except HTTPException:
         raise
