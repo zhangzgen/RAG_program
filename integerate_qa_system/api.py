@@ -1163,6 +1163,8 @@ async def startup_event():
         qa_system.logger.info("知识库表初始化完成")
         qa_system.mysql_client.create_config_version_table()
         qa_system.logger.info("配置版本表初始化完成")
+        qa_system.mysql_client.create_case_table()
+        qa_system.logger.info("Case表初始化完成")
     except Exception as e:
         qa_system.logger.error(f"知识库表初始化失败: {e}")
 
@@ -1557,6 +1559,83 @@ async def delete_faq(faq_id: int, user: dict = Depends(get_current_user)):
     except Exception as e:
         qa_system.logger.error(f"删除FAQ失败: {e}")
         raise HTTPException(status_code=500, detail=f"删除FAQ失败: {str(e)}")
+
+
+class CaseCreate(BaseModel):
+    session_id: Optional[str] = None
+    query: str
+    answer: str
+    trace_data: Optional[str] = None
+    status: int
+
+
+@app.post("/case")
+async def create_case(case: CaseCreate, user: dict = Depends(get_current_user)):
+    """创建Case记录（点赞或踩）"""
+    try:
+        if case.status not in [0, 1]:
+            raise HTTPException(status_code=400, detail="status必须为0(BadCase)或1(GoodCase)")
+        
+        case_id = qa_system.mysql_client.add_case(
+            session_id=case.session_id,
+            query=case.query,
+            answer=case.answer,
+            trace_data=case.trace_data,
+            status=case.status
+        )
+        status_text = "GoodCase" if case.status == 1 else "BadCase"
+        return {'success': True, 'id': case_id, 'message': f'{status_text}记录成功'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"创建Case记录失败: {e}")
+        raise HTTPException(status_code=500, detail=f"创建Case记录失败: {str(e)}")
+
+
+@app.get("/case")
+async def get_cases(
+    status: Optional[int] = None, 
+    limit: int = 50, 
+    offset: int = 0,
+    user: dict = Depends(get_current_user)
+):
+    """获取Case列表"""
+    try:
+        if status is not None and status not in [0, 1]:
+            raise HTTPException(status_code=400, detail="status必须为0(BadCase)或1(GoodCase)")
+        
+        cases = qa_system.mysql_client.get_cases(status=status, limit=limit, offset=offset)
+        total = qa_system.mysql_client.get_case_count(status=status)
+        good_count = qa_system.mysql_client.get_case_count(status=1)
+        bad_count = qa_system.mysql_client.get_case_count(status=0)
+        
+        return {
+            'success': True,
+            'cases': cases,
+            'total': total,
+            'good_count': good_count,
+            'bad_count': bad_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"获取Case列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取Case列表失败: {str(e)}")
+
+
+@app.delete("/case/{case_id}")
+async def delete_case(case_id: int, user: dict = Depends(get_current_user)):
+    """删除Case记录"""
+    try:
+        success = qa_system.mysql_client.delete_case(case_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Case不存在")
+        return {'success': True, 'message': 'Case删除成功'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"删除Case记录失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除Case记录失败: {str(e)}")
 
 
 if __name__ == '__main__':

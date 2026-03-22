@@ -4,13 +4,14 @@
   flex-direction: column;
   background: #ffffff;
   height: 100%;
+  width: 100%;
   overflow: hidden;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .chat-messages-modern {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px;
@@ -19,7 +20,7 @@
   gap: 12px;
   will-change: scroll-position;
   -webkit-overflow-scrolling: touch;
-  min-height: 0;
+  min-height: 100px;
 }
 
 .chat-messages-modern::-webkit-scrollbar {
@@ -40,11 +41,12 @@
 }
 
 .welcome-container-modern {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
+  min-height: 200px;
+  width: 100%;
 }
 
 .welcome-content-modern {
@@ -303,30 +305,24 @@
   width: 100%;
   display: flex;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 /* 侧边栏收缩时的输入栏位置调整 */
 .input-container-modern.input-centered {
   position: absolute;
-  bottom: 40%;
+  bottom: 50%;
   left: 50%;
   transform: translate(-50%, 50%);
   width: auto;
-  max-width: 960px;
+  max-width: 720px;
   padding: 0;
   border-top: none;
-  /* 添加过渡动画 */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 当侧边栏展开时，调整输入栏位置 */
-.app-modern-container:not(.sidebar-collapsed) .input-container-modern.input-centered {
-  max-width: calc(100% - 130px);
-}
-
-/* 当侧边栏收缩时，调整输入栏位置 */
-.app-modern-container.sidebar-collapsed .input-container-modern.input-centered {
-  max-width: calc(100% - 44px);
+.chat-area-modern .input-container-modern.input-centered {
+  max-width: 720px;
 }
 
 .input-form-modern {
@@ -763,6 +759,69 @@
   to {
     opacity: 1;
   }
+}
+
+.rate-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-content-modern:hover .rate-buttons {
+  opacity: 1;
+}
+
+.rate-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: all 0.2s ease;
+}
+
+.rate-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.rate-btn.like-btn:hover:not(:disabled) {
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.rate-btn.dislike-btn:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.rate-btn.like-btn.rated {
+  color: #10b981;
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.rate-btn.dislike-btn.rated {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.rate-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.rate-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .message-text-modern.markdown-content.streaming {

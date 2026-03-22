@@ -4,7 +4,7 @@ import ChatAreaModern from './components/ChatAreaModern';
 import KnowledgePage from './components/KnowledgePage';
 import ConfigPage from './components/ConfigPage';
 import FqaPage from './components/FqaPage';
-import PlaceholderPage from './components/PlaceholderPage';
+import CasePage from './components/CasePage';
 import Login from './components/Login';
 import { verifyToken } from './api';
 import './AppModern.css';
@@ -121,6 +121,9 @@ function App() {
     if (newMode === 'professional') {
       setSelectedCategory(null);
       setProfessionalTab('knowledge');
+    } else if (newMode === 'qa') {
+      setCurrentSessionId('');
+      setSessionData(null);
     }
   };
 
@@ -156,7 +159,7 @@ function App() {
   }
 
   return (
-    <div className={`app-modern-container ${isSidebarHidden ? 'sidebar-hidden' : ''}`}>
+    <div className={`app-modern-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isSidebarHidden ? 'sidebar-hidden' : ''}`}>
       <SidebarModern
         ref={sidebarRef}
         currentSessionId={currentSessionId}
@@ -180,6 +183,7 @@ function App() {
       <div className="main-modern-area">
         {mode === 'qa' ? (
           <ChatAreaModern
+            key={sessionData?.session_id || 'new'}
             ref={chatAreaRef}
             sessionData={sessionData}
             onSessionCreated={handleSessionCreated}
@@ -191,8 +195,10 @@ function App() {
             <ConfigPage />
           ) : professionalTab === 'fqa' ? (
             <FqaPage />
+          ) : professionalTab === 'case' ? (
+            <CasePage />
           ) : (
-            <PlaceholderPage title="Case分析" description="Case分析页面正在开发中..." />
+            <KnowledgePage />
           )
         )}
       </div>

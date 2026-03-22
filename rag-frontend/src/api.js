@@ -373,3 +373,22 @@ export const deleteFaq = async (faqId) => {
   const response = await api.delete(`/faq/${faqId}`);
   return response.data;
 };
+
+export const createCase = async (data) => {
+  const response = await api.post('/case', data);
+  return response.data;
+};
+
+export const getCases = async (status = null, limit = 50, offset = 0) => {
+  const params = { limit, offset };
+  if (status !== null) {
+    params.status = status;
+  }
+  const response = await api.get('/case', { params });
+  return response.data;
+};
+
+export const deleteCase = async (caseId) => {
+  const response = await api.delete(`/case/${caseId}`);
+  return response.data;
+};

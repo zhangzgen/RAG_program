@@ -1001,6 +1001,131 @@ class MysqlClient(object):
             self.connect.rollback()
             raise
 
+    def create_case_table(self):
+        """创建Case表"""
+        try:
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS case_record (
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'Case ID',
+                    session_id VARCHAR(100) COMMENT '会话ID',
+                    query TEXT NOT NULL COMMENT '用户问题',
+                    answer TEXT NOT NULL COMMENT '模型回答',
+                    trace_data TEXT COMMENT '执行链路JSON数据',
+                    status TINYINT(1) NOT NULL DEFAULT 0 COMMENT '状态：0-BadCase, 1-GoodCase',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    INDEX idx_session_id (session_id),
+                    INDEX idx_status (status),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Case记录表'
+            ''')
+            self.connect.commit()
+            logger.info('Case表创建成功')
+        except pymysql.MySQLError as e:
+            logger.error(f'Case表创建失败: {e}')
+            raise
+
+    def add_case(self, session_id, query, answer, trace_data, status):
+        """
+        添加Case记录
+        
+        Args:
+            session_id: 会话ID
+            query: 用户问题
+            answer: 模型回答
+            trace_data: 执行链路JSON数据
+            status: 状态 0-BadCase, 1-GoodCase
+            
+        Returns:
+            int: Case ID
+        """
+        try:
+            self.cursor.execute('''
+                INSERT INTO case_record (session_id, query, answer, trace_data, status) 
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (session_id, query, answer, trace_data, status))
+            self.connect.commit()
+            case_id = self.cursor.lastrowid
+            logger.info(f'Case记录添加成功: case_id={case_id}')
+            return case_id
+        except Exception as e:
+            logger.error(f'添加Case记录失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def get_cases(self, status=None, limit=50, offset=0):
+        """
+        获取Case列表
+        
+        Args:
+            status: 状态筛选，None表示全部
+            limit: 返回数量限制
+            offset: 偏移量
+            
+        Returns:
+            list: Case列表
+        """
+        try:
+            if status is not None:
+                self.cursor.execute('''
+                    SELECT id, session_id, query, answer, trace_data, status, created_at 
+                    FROM case_record 
+                    WHERE status = %s
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                ''', (status, limit, offset))
+            else:
+                self.cursor.execute('''
+                    SELECT id, session_id, query, answer, trace_data, status, created_at 
+                    FROM case_record 
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                ''', (limit, offset))
+            results = self.cursor.fetchall()
+            return [{
+                'id': r[0],
+                'session_id': r[1],
+                'query': r[2],
+                'answer': r[3],
+                'trace_data': r[4],
+                'status': r[5],
+                'created_at': str(r[6])
+            } for r in results]
+        except Exception as e:
+            logger.error(f'获取Case列表失败: {e}')
+            return []
+
+    def get_case_count(self, status=None):
+        """
+        获取Case数量
+        
+        Args:
+            status: 状态筛选，None表示全部
+            
+        Returns:
+            int: Case数量
+        """
+        try:
+            if status is not None:
+                self.cursor.execute('SELECT COUNT(*) FROM case_record WHERE status = %s', (status,))
+            else:
+                self.cursor.execute('SELECT COUNT(*) FROM case_record')
+            result = self.cursor.fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logger.error(f'获取Case数量失败: {e}')
+            return 0
+
+    def delete_case(self, case_id):
+        """删除Case记录"""
+        try:
+            self.cursor.execute('DELETE FROM case_record WHERE id = %s', (case_id,))
+            self.connect.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'删除Case记录失败: {e}')
+            self.connect.rollback()
+            raise
+
 
 if __name__ == '__main__':
     mysql_client = MysqlClient()
