@@ -332,23 +332,27 @@ const KnowledgePage = () => {
         }
       }
       
+      let totalCompleted = 0;
+      let totalFiles = 0;
+      let totalResults = [];
+      
       const processChunk = (data) => {
         if (data.type === 'start') {
-          setChunkProgress({ current: 0, total: data.total });
+          totalFiles += data.total;
+          setChunkProgress({ current: totalCompleted, total: totalFiles });
         } else if (data.type === 'result') {
-          if (data.completed !== undefined) {
-            setChunkProgress({ current: data.completed, total: data.total });
-          }
-          setChunkResults(prev => [...prev, {
+          totalCompleted += 1;
+          totalResults.push({
             file_id: data.file_id,
             file_name: data.file_name,
             status: data.status,
             chunks: data.chunks,
             error: data.error
-          }]);
+          });
+          setChunkProgress({ current: totalCompleted, total: totalFiles });
+          setChunkResults([...totalResults]);
         } else if (data.type === 'complete') {
-          setChunkProgress({ current: data.total, total: data.total });
-          setChunkComplete(true);
+          setChunkProgress({ current: totalCompleted, total: totalFiles });
         }
       };
       
@@ -361,6 +365,9 @@ const KnowledgePage = () => {
       if (fileIds.length > 0) {
         await chunkFilesPost(fileIds, null, processChunk);
       }
+      
+      setChunkProgress({ current: totalFiles, total: totalFiles });
+      setChunkComplete(true);
     } catch (error) {
       console.error('切片失败:', error);
       alert(error.message || '切片失败');
