@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { queryAPI, createSession, createCase } from '../api';
+import { queryAPI, createSession } from '../api';
 import './ChatAreaModern.css';
 
 let messageIdCounter = 0;
@@ -15,7 +15,6 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
   const [hasStarted, setHasStarted] = useState(false);
   const [sessionCreated, setSessionCreated] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
-  const [ratedMessages, setRatedMessages] = useState({});
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -32,56 +31,32 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     }
   };
 
-  const handleRate = async (messageIndex, status, query, answer) => {
-    if (ratedMessages[messageIndex]) {
-      return;
-    }
-    
-    try {
-      await createCase({
-        session_id: sessionId || null,
-        query: query,
-        answer: answer,
-        trace_data: null,
-        status: status
-      });
-      setRatedMessages(prev => ({
-        ...prev,
-        [messageIndex]: status
-      }));
-    } catch (error) {
-      console.error('提交评价失败:', error);
-    }
-  };
-
   useImperativeHandle(ref, () => ({
     clearMessages: () => {
       setMessages([]);
       setHasStarted(false);
       setSessionCreated(false);
-      setRatedMessages({});
       streamingContentRef.current = '';
       streamingMessageIndexRef.current = -1;
     }
   }));
 
-  const loadSessionData = useCallback((data) => {
-    if (data === null || data === undefined) {
+  useEffect(() => {
+    if (sessionData === null) {
       setMessages([]);
       setHasStarted(false);
       setSessionCreated(false);
       setSessionId('');
-      setRatedMessages({});
       return;
     }
     
-    if (!data.session_id) {
+    if (!sessionData || !sessionData.session_id) {
       return;
     }
     
-    if (data.conversations && Array.isArray(data.conversations) && data.conversations.length > 0) {
+    if (sessionData.conversations && Array.isArray(sessionData.conversations) && sessionData.conversations.length > 0) {
       const formattedMessages = [];
-      data.conversations.forEach(conv => {
+      sessionData.conversations.forEach(conv => {
         formattedMessages.push({ 
           id: generateMessageId(),
           role: 'user', 
@@ -96,18 +71,14 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       setMessages(formattedMessages);
       setHasStarted(true);
       setSessionCreated(true);
-      setSessionId(data.session_id);
-    } else if (data.session_id) {
+      setSessionId(sessionData.session_id);
+    } else {
       setMessages([]);
       setHasStarted(true);
       setSessionCreated(true);
-      setSessionId(data.session_id);
+      setSessionId(sessionData.session_id);
     }
-  }, []);
-
-  useEffect(() => {
-    loadSessionData(sessionData);
-  }, [sessionData, loadSessionData]);
+  }, [sessionData]);
 
   useEffect(() => {
     scrollToBottom();
@@ -333,36 +304,6 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                         )}
                       </button>
                     )}
-                  </div>
-                )}
-                {!isStreaming && !isStreamingContent && message.role === 'assistant' && message.content && index > 0 && (
-                  <div className="rate-buttons">
-                    <button
-                      className={`rate-btn like-btn ${ratedMessages[index] === 1 ? 'rated' : ''}`}
-                      onClick={() => {
-                        const userQuery = messages[index - 1]?.content || '';
-                        handleRate(index, 1, userQuery, message.content);
-                      }}
-                      disabled={ratedMessages[index] !== undefined}
-                      title="点赞"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={ratedMessages[index] === 1 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-                      </svg>
-                    </button>
-                    <button
-                      className={`rate-btn dislike-btn ${ratedMessages[index] === 0 ? 'rated' : ''}`}
-                      onClick={() => {
-                        const userQuery = messages[index - 1]?.content || '';
-                        handleRate(index, 0, userQuery, message.content);
-                      }}
-                      disabled={ratedMessages[index] !== undefined}
-                      title="踩"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={ratedMessages[index] === 0 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
-                      </svg>
-                    </button>
                   </div>
                 )}
               </div>
