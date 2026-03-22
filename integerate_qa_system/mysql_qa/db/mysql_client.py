@@ -895,6 +895,95 @@ class MysqlClient(object):
             logger.error(f'获取配置版本详情失败: {e}')
             return None
 
+    def get_all_faqs(self, search_keyword=None):
+        """获取所有FAQ，支持模糊搜索"""
+        try:
+            if search_keyword:
+                search_pattern = f'%{search_keyword}%'
+                self.cursor.execute('''
+                    SELECT id, subject_name, question, answer 
+                    FROM jpkb 
+                    WHERE subject_name LIKE %s OR question LIKE %s
+                    ORDER BY id DESC
+                ''', (search_pattern, search_pattern))
+            else:
+                self.cursor.execute('''
+                    SELECT id, subject_name, question, answer 
+                    FROM jpkb 
+                    ORDER BY id DESC
+                ''')
+            results = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'subject_name': row[1],
+                'question': row[2],
+                'answer': row[3]
+            } for row in results]
+        except Exception as e:
+            logger.error(f'获取FAQ列表失败: {e}')
+            return []
+
+    def get_faq_by_id(self, faq_id):
+        """根据ID获取FAQ"""
+        try:
+            self.cursor.execute('''
+                SELECT id, subject_name, question, answer 
+                FROM jpkb 
+                WHERE id = %s
+            ''', (faq_id,))
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'subject_name': result[1],
+                    'question': result[2],
+                    'answer': result[3]
+                }
+            return None
+        except Exception as e:
+            logger.error(f'获取FAQ详情失败: {e}')
+            return None
+
+    def add_faq(self, subject_name, question, answer):
+        """添加FAQ"""
+        try:
+            self.cursor.execute('''
+                INSERT INTO jpkb (subject_name, question, answer) 
+                VALUES (%s, %s, %s)
+            ''', (subject_name, question, answer))
+            self.connect.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            logger.error(f'添加FAQ失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def update_faq(self, faq_id, subject_name, question, answer):
+        """更新FAQ"""
+        try:
+            self.cursor.execute('''
+                UPDATE jpkb 
+                SET subject_name = %s, question = %s, answer = %s 
+                WHERE id = %s
+            ''', (subject_name, question, answer, faq_id))
+            self.connect.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'更新FAQ失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def delete_faq(self, faq_id):
+        """删除FAQ"""
+        try:
+            self.cursor.execute('DELETE FROM jpkb WHERE id = %s', (faq_id,))
+            self.connect.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'删除FAQ失败: {e}')
+            self.connect.rollback()
+            raise
+
 
 if __name__ == '__main__':
     mysql_client = MysqlClient()

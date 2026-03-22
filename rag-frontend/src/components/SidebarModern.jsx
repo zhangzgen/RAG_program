@@ -14,6 +14,7 @@ const FILE_ICONS = {
 const PROFESSIONAL_MENU_ITEMS = [
   { id: 'config', label: '配置信息' },
   { id: 'knowledge', label: '知识库' },
+  { id: 'fqa', label: 'FQA管理' },
   { id: 'case', label: 'Case分析' }
 ];
 

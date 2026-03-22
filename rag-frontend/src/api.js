@@ -347,3 +347,29 @@ export const rollbackConfig = async (versionId) => {
   const response = await api.post(`/config/rollback/${versionId}`);
   return response.data;
 };
+
+export const getFaqs = async (search = null) => {
+  const params = search ? { search } : {};
+  const response = await api.get('/faq', { params });
+  return response.data;
+};
+
+export const getFaq = async (faqId) => {
+  const response = await api.get(`/faq/${faqId}`);
+  return response.data;
+};
+
+export const createFaq = async (data) => {
+  const response = await api.post('/faq', data);
+  return response.data;
+};
+
+export const updateFaq = async (faqId, data) => {
+  const response = await api.put(`/faq/${faqId}`, data);
+  return response.data;
+};
+
+export const deleteFaq = async (faqId) => {
+  const response = await api.delete(`/faq/${faqId}`);
+  return response.data;
+};
