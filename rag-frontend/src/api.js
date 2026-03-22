@@ -373,3 +373,18 @@ export const deleteFaq = async (faqId) => {
   const response = await api.delete(`/faq/${faqId}`);
   return response.data;
 };
+
+export const updateConversationStatus = async (conversationId, status) => {
+  const response = await api.patch(`/conversations/${conversationId}/status`, { status });
+  return response.data;
+};
+
+export const getCases = async (status, page = 1, pageSize = 20) => {
+  const response = await api.get('/cases', { params: { status, page, page_size: pageSize } });
+  return response.data;
+};
+
+export const getCaseDetail = async (conversationId) => {
+  const response = await api.get(`/cases/${conversationId}`);
+  return response.data;
+};

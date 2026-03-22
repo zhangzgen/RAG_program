@@ -46,9 +46,12 @@ redis_client = RedisClient()
 
 # 定义会话历史的数据模型
 class Conversation(BaseModel):
+    id: Optional[int] = None
     query: str
     answer: str
     timestamp: str
+    status: int = 0
+    trace_data: Optional[str] = None
 
 
 # 定义会话列表的数据模型
@@ -384,9 +387,12 @@ async def get_session_conversations(
             session_id=session_id,
             conversations=[
                 Conversation(
+                    id=conv[5],
                     query=conv[0],
                     answer=conv[1],
-                    timestamp=conv[2].strftime("%Y-%m-%d %H:%M:%S")
+                    timestamp=conv[2].strftime("%Y-%m-%d %H:%M:%S"),
+                    status=conv[3] if len(conv) > 3 else 0,
+                    trace_data=conv[4] if len(conv) > 4 else None
                 )
                 # 反转结果，按时间正序返回
                 for conv in conversations[::-1]
@@ -422,6 +428,123 @@ async def delete_session(session_id: str, user: dict = Depends(get_current_user)
     except Exception as e:
         qa_system.logger.error(f"删除会话失败: {e}")
         raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
+
+
+class UpdateStatusRequest(BaseModel):
+    status: int
+
+
+@app.patch("/conversations/{conversation_id}/status")
+async def update_conversation_status(
+    conversation_id: int, 
+    request: UpdateStatusRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    更新对话状态（点赞/踩）
+    需要在请求头中携带：Authorization: Bearer <token>
+    参数：
+        conversation_id: 对话ID
+        status: 状态值 (0-默认, 1-GoodCase, 2-BadCase)
+    返回：
+        成功消息
+    """
+    try:
+        if request.status not in [0, 1, 2]:
+            raise HTTPException(status_code=400, detail="状态值必须为0、1或2")
+        
+        success = qa_system.mysql_client.update_conversation_status(conversation_id, request.status)
+        if success:
+            status_text = {0: "默认", 1: "GoodCase", 2: "BadCase"}
+            return {"message": f"对话状态已更新为: {status_text[request.status]}", "status": request.status}
+        else:
+            raise HTTPException(status_code=404, detail="对话不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"更新对话状态失败: {e}")
+        raise HTTPException(status_code=500, detail=f"更新对话状态失败: {str(e)}")
+
+
+class CaseDetail(BaseModel):
+    id: int
+    session_id: str
+    query: str
+    answer: str
+    trace_data: Optional[str] = None
+    status: int
+    created_at: str
+
+
+class CaseListResponse(BaseModel):
+    cases: List[CaseDetail]
+    total: int
+    page: int
+    page_size: int
+
+
+@app.get("/cases")
+async def get_cases(
+    status: int = 1,
+    page: int = 1,
+    page_size: int = 20,
+    user: dict = Depends(get_current_user)
+):
+    """
+    获取Case列表（GoodCase或BadCase）
+    需要在请求头中携带：Authorization: Bearer <token>
+    参数：
+        status: 状态值 (1-GoodCase, 2-BadCase)
+        page: 页码
+        page_size: 每页数量
+    返回：
+        Case列表
+    """
+    try:
+        if status not in [1, 2]:
+            raise HTTPException(status_code=400, detail="状态值必须为1(GoodCase)或2(BadCase)")
+        
+        offset = (page - 1) * page_size
+        cases = qa_system.mysql_client.get_conversations_by_status(status, limit=page_size, offset=offset)
+        total = qa_system.mysql_client.get_conversations_count_by_status(status)
+        
+        return CaseListResponse(
+            cases=[CaseDetail(**case) for case in cases],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"获取Case列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取Case列表失败: {str(e)}")
+
+
+@app.get("/cases/{conversation_id}")
+async def get_case_detail(
+    conversation_id: int,
+    user: dict = Depends(get_current_user)
+):
+    """
+    获取Case详情
+    需要在请求头中携带：Authorization: Bearer <token>
+    参数：
+        conversation_id: 对话ID
+    返回：
+        Case详情，包含trace_data
+    """
+    try:
+        case = qa_system.mysql_client.get_conversation_by_id(conversation_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case不存在")
+        
+        return CaseDetail(**case)
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"获取Case详情失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取Case详情失败: {str(e)}")
 
 
 DATA_BASE_PATH = r"d:\WorkSpace\RAG_program\integerate_qa_system\data"

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { queryAPI, createSession } from '../api';
+import { queryAPI, createSession, updateConversationStatus } from '../api';
 import './ChatAreaModern.css';
 
 let messageIdCounter = 0;
@@ -15,6 +15,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
   const [hasStarted, setHasStarted] = useState(false);
   const [sessionCreated, setSessionCreated] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [messageStatus, setMessageStatus] = useState({});
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -28,6 +29,18 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
       console.error('复制失败:', err);
+    }
+  };
+
+  const handleStatusUpdate = async (conversationId, status) => {
+    try {
+      await updateConversationStatus(conversationId, status);
+      setMessageStatus(prev => ({
+        ...prev,
+        [conversationId]: status
+      }));
+    } catch (err) {
+      console.error('更新状态失败:', err);
     }
   };
 
@@ -47,6 +60,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       setHasStarted(false);
       setSessionCreated(false);
       setSessionId('');
+      setMessageStatus({});
       return;
     }
     
@@ -56,19 +70,26 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     
     if (sessionData.conversations && Array.isArray(sessionData.conversations) && sessionData.conversations.length > 0) {
       const formattedMessages = [];
+      const statusMap = {};
       sessionData.conversations.forEach(conv => {
         formattedMessages.push({ 
           id: generateMessageId(),
           role: 'user', 
-          content: conv.query 
+          content: conv.query,
+          conversationId: conv.id
         });
         formattedMessages.push({ 
           id: generateMessageId(),
           role: 'assistant', 
-          content: conv.answer 
+          content: conv.answer,
+          conversationId: conv.id
         });
+        if (conv.id && conv.status !== undefined) {
+          statusMap[conv.id] = conv.status;
+        }
       });
       setMessages(formattedMessages);
+      setMessageStatus(statusMap);
       setHasStarted(true);
       setSessionCreated(true);
       setSessionId(sessionData.session_id);
@@ -269,42 +290,70 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                     <span></span>
                   </div>
                 ) : (
-                  <div className="message-text-wrapper">
-                    {message.role === 'assistant' ? (
-                      <div className={`message-text-modern markdown-content ${isStreamingContent ? 'streaming' : ''}`}>
-                        <ReactMarkdown 
-                          key={`${messageKey}_md`}
-                          remarkPlugins={[remarkGfm]}
-                          skipHtml={true}
+                  <>
+                    <div className="message-text-wrapper">
+                      {message.role === 'assistant' ? (
+                        <div className={`message-text-modern markdown-content ${isStreamingContent ? 'streaming' : ''}`}>
+                          <ReactMarkdown 
+                            key={`${messageKey}_md`}
+                            remarkPlugins={[remarkGfm]}
+                            skipHtml={true}
+                          >
+                            {message.content || ''}
+                          </ReactMarkdown>
+                          {isStreamingContent && <span className="streaming-cursor"></span>}
+                        </div>
+                      ) : (
+                        <div className="message-text-modern">
+                          {message.content}
+                        </div>
+                      )}
+                      {!isStreamingContent && message.content && (
+                        <button 
+                          className="copy-btn-modern"
+                          onClick={() => copyToClipboard(message.content, messageKey)}
+                          title="复制消息"
                         >
-                          {message.content || ''}
-                        </ReactMarkdown>
-                        {isStreamingContent && <span className="streaming-cursor"></span>}
-                      </div>
-                    ) : (
-                      <div className="message-text-modern">
-                        {message.content}
+                          {copiedIndex === messageKey ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {!isStreamingContent && message.content && message.role === 'assistant' && message.conversationId && (
+                      <div className="message-footer-modern">
+                        <div className="feedback-buttons-modern">
+                          <button 
+                            className={`feedback-btn-modern like-btn ${messageStatus[message.conversationId] === 1 ? 'active' : ''}`}
+                            onClick={() => handleStatusUpdate(message.conversationId, messageStatus[message.conversationId] === 1 ? 0 : 1)}
+                            title="赞"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill={messageStatus[message.conversationId] === 1 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                            </svg>
+                            <span>赞</span>
+                          </button>
+                          <button 
+                            className={`feedback-btn-modern dislike-btn ${messageStatus[message.conversationId] === 2 ? 'active' : ''}`}
+                            onClick={() => handleStatusUpdate(message.conversationId, messageStatus[message.conversationId] === 2 ? 0 : 2)}
+                            title="踩"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill={messageStatus[message.conversationId] === 2 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
+                            </svg>
+                            <span>踩</span>
+                          </button>
+                        </div>
                       </div>
                     )}
-                    {!isStreamingContent && message.content && (
-                      <button 
-                        className="copy-btn-modern"
-                        onClick={() => copyToClipboard(message.content, messageKey)}
-                        title="复制消息"
-                      >
-                        {copiedIndex === messageKey ? (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        ) : (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                          </svg>
-                        )}
-                      </button>
-                    )}
-                  </div>
+                  </>
                 )}
               </div>
             </div>

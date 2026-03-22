@@ -229,6 +229,61 @@
   color: #374151;
 }
 
+.message-footer-modern {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.feedback-buttons-modern {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.feedback-btn-modern {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.feedback-btn-modern svg {
+  width: 10px;
+  height: 10px;
+}
+
+.feedback-btn-modern span {
+  font-size: 10px;
+}
+
+.feedback-btn-modern:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.feedback-btn-modern.like-btn.active {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+.feedback-btn-modern.dislike-btn.active {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
 .user-message-modern .copy-btn-modern {
   right: auto;
   left: -16px;

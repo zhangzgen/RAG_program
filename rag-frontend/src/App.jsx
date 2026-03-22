@@ -4,7 +4,7 @@ import ChatAreaModern from './components/ChatAreaModern';
 import KnowledgePage from './components/KnowledgePage';
 import ConfigPage from './components/ConfigPage';
 import FqaPage from './components/FqaPage';
-import PlaceholderPage from './components/PlaceholderPage';
+import CasePage from './components/CasePage';
 import Login from './components/Login';
 import { verifyToken } from './api';
 import './AppModern.css';
@@ -192,7 +192,7 @@ function App() {
           ) : professionalTab === 'fqa' ? (
             <FqaPage />
           ) : (
-            <PlaceholderPage title="Case分析" description="Case分析页面正在开发中..." />
+            <CasePage />
           )
         )}
       </div>

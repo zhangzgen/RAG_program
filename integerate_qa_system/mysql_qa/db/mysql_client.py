@@ -75,8 +75,10 @@ class MysqlClient(object):
                     query TEXT NOT NULL,
                     answer TEXT NOT NULL,
                     trace_data TEXT NULL COMMENT '系统执行链路JSON数据',
+                    status INT NOT NULL DEFAULT 0 COMMENT '0-默认, 1-GoodCase, 2-BadCase',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NULL,
                     INDEX idx_session_id (session_id),
+                    INDEX idx_status (status),
                     CONSTRAINT fk_conversations_session_id FOREIGN KEY (session_id) REFERENCES user_session (session_id) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='对话记录表'
             ''')
@@ -99,6 +101,15 @@ class MysqlClient(object):
                     self.cursor.execute('ALTER TABLE conversations MODIFY COLUMN trace_data TEXT NULL COMMENT "系统执行链路JSON数据"')
                     self.connect.commit()
                     logger.info('conversations表trace_data字段类型已修改为TEXT')
+            
+            # 检查并添加 status 字段
+            self.cursor.execute("SHOW COLUMNS FROM conversations LIKE 'status'")
+            status_result = self.cursor.fetchone()
+            if not status_result:
+                self.cursor.execute('ALTER TABLE conversations ADD COLUMN status INT NOT NULL DEFAULT 0 COMMENT "0-默认, 1-GoodCase, 2-BadCase" AFTER trace_data')
+                self.cursor.execute('ALTER TABLE conversations ADD INDEX idx_status (status)')
+                self.connect.commit()
+                logger.info('conversations表添加status字段成功')
         except pymysql.MySQLError as e:
             logger.error(f'表创建失败: {e}')
             raise
@@ -355,7 +366,7 @@ class MysqlClient(object):
 
     def fetch_conversations(self, session_id, limit=10):
         try:
-            select_query = """SELECT query, answer, created_at FROM conversations WHERE session_id = %s ORDER BY created_at DESC LIMIT %s"""
+            select_query = """SELECT query, answer, created_at, status, trace_data, id FROM conversations WHERE session_id = %s ORDER BY created_at DESC LIMIT %s"""
             self.cursor.execute(select_query, (session_id, limit))
             conversations = self.cursor.fetchall()
             logger.info(f'会话查询成功: {session_id}')
@@ -363,6 +374,115 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'会话查询失败: {e}')
             return []
+    
+    def get_conversation_by_id(self, conversation_id):
+        """
+        根据ID获取对话详情
+        
+        Args:
+            conversation_id: 对话ID
+            
+        Returns:
+            dict: 对话详情
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, session_id, query, answer, trace_data, status, created_at
+                FROM conversations 
+                WHERE id = %s
+            ''', (conversation_id,))
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'session_id': result[1],
+                    'query': result[2],
+                    'answer': result[3],
+                    'trace_data': result[4],
+                    'status': result[5],
+                    'created_at': str(result[6])
+                }
+            return None
+        except Exception as e:
+            logger.error(f'获取对话详情失败: {e}')
+            return None
+    
+    def update_conversation_status(self, conversation_id, status):
+        """
+        更新对话状态
+        
+        Args:
+            conversation_id: 对话ID
+            status: 状态值 (0-默认, 1-GoodCase, 2-BadCase)
+            
+        Returns:
+            bool: 更新成功返回True
+        """
+        try:
+            self.cursor.execute('''
+                UPDATE conversations 
+                SET status = %s 
+                WHERE id = %s
+            ''', (status, conversation_id))
+            self.connect.commit()
+            logger.info(f'对话状态更新成功: conversation_id={conversation_id}, status={status}')
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'更新对话状态失败: {e}')
+            self.connect.rollback()
+            return False
+    
+    def get_conversations_by_status(self, status, limit=50, offset=0):
+        """
+        根据状态获取对话列表
+        
+        Args:
+            status: 状态值 (1-GoodCase, 2-BadCase)
+            limit: 返回数量限制
+            offset: 偏移量
+            
+        Returns:
+            list: 对话列表
+        """
+        try:
+            self.cursor.execute('''
+                SELECT id, session_id, query, answer, trace_data, status, created_at
+                FROM conversations 
+                WHERE status = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            ''', (status, limit, offset))
+            results = self.cursor.fetchall()
+            return [{
+                'id': r[0],
+                'session_id': r[1],
+                'query': r[2],
+                'answer': r[3],
+                'trace_data': r[4],
+                'status': r[5],
+                'created_at': str(r[6])
+            } for r in results]
+        except Exception as e:
+            logger.error(f'根据状态获取对话列表失败: {e}')
+            return []
+    
+    def get_conversations_count_by_status(self, status):
+        """
+        获取指定状态的对话数量
+        
+        Args:
+            status: 状态值
+            
+        Returns:
+            int: 数量
+        """
+        try:
+            self.cursor.execute('SELECT COUNT(*) FROM conversations WHERE status = %s', (status,))
+            result = self.cursor.fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logger.error(f'获取对话数量失败: {e}')
+            return 0
 
     def fetch_all_sessions(self, limit=20):
         """已废弃，请使用 get_user_sessions"""
