@@ -4,6 +4,8 @@ from mysql_qa import MysqlClient, RedisClient, BM25Search
 from rag_qa import VectorStore, RAGSystem
 # 导入配置和日志工具，用于系统配置和日志记录
 from base import logger, Config
+# 导入执行链路模型
+from base.trace_models import SessionTrace, RedisTrace, MysqlTrace, MilvusTrace, LlmTrace, TraceContext
 # 导入 OpenAI 客户端，用于调用 DashScope API
 from openai import OpenAI
 # 导入时间库，用于记录处理时间
@@ -119,10 +121,18 @@ class IntegratedQASystem:
             self.logger.error(f"LLM调用失败: {e}")
             yield f"错误：LLM调用失败 - {e}"
 
-    def _fetch_recent_history(self, session_id: str) -> list:
+    def _fetch_recent_history(self, session_id: str, session_trace: SessionTrace = None) -> list:
         """获取最近5轮对话历史"""
+        mysql_trace = None
+        if session_trace:
+            mysql_trace = session_trace.create_mysql_trace()
+            mysql_trace.start(
+                sql_statement="SELECT query, answer FROM conversations WHERE session_id = %s ORDER BY created_at DESC LIMIT 5",
+                query_type="SELECT",
+                table_name="conversations"
+            )
+        
         try:
-            # 执行 SQL 查询，获取最近 5 轮对话
             self.mysql_client.cursor.execute("""
                 SELECT query, answer
                 FROM conversations
@@ -130,32 +140,48 @@ class IntegratedQASystem:
                 ORDER BY created_at DESC
                 LIMIT %s
             """, (session_id, 5))
-            # 将查询结果转换为字典列表
             history = [{"query": row[0], "answer": row[1]} for row in self.mysql_client.cursor.fetchall()]
-            # 反转结果，按时间正序返回
+            
+            if mysql_trace:
+                mysql_trace.end(content=f"获取到 {len(history)} 条历史记录", affected_rows=len(history))
+            
             return history[::-1]
         except pymysql.MySQLError as e:
-            # 记录查询失败的错误日志
             self.logger.error(f"获取对话历史失败: {e}")
-            # 返回空列表
+            if mysql_trace:
+                mysql_trace.end(error=str(e))
             return []
 
-    def get_session_history(self, session_id: str) -> list:
+    def get_session_history(self, session_id: str, session_trace: SessionTrace = None) -> list:
         """从MySQL获取会话历史"""
-        # 调用 _fetch_recent_history 获取对话历史
-        return self._fetch_recent_history(session_id)
+        return self._fetch_recent_history(session_id, session_trace)
 
-    def update_session_history(self, session_id: str, question: str, answer: str) -> list:
+    def update_session_history(self, session_id: str, question: str, answer: str, 
+                                session_trace: SessionTrace = None, trace_data: str = None) -> list:
         """更新会话历史到MySQL，保留最近5轮对话"""
+        mysql_trace = None
+        if session_trace:
+            mysql_trace = session_trace.create_mysql_trace()
+            mysql_trace.start(
+                sql_statement="INSERT INTO conversations (session_id, query, answer, trace_data, created_at) VALUES ...",
+                query_type="INSERT",
+                table_name="conversations"
+            )
+        
         try:
-            # 插入新的对话记录
-            self.mysql_client.cursor.execute("""
-                INSERT INTO conversations (session_id, query, answer, created_at)
-                VALUES (%s, %s, %s, NOW())
-            """, (session_id, question, answer))
-            # 获取更新后的对话历史
-            history = self._fetch_recent_history(session_id)
-            # 删除超出 5 轮的旧记录
+            if trace_data:
+                self.mysql_client.cursor.execute("""
+                    INSERT INTO conversations (session_id, query, answer, trace_data, created_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                """, (session_id, question, answer, trace_data))
+            else:
+                self.mysql_client.cursor.execute("""
+                    INSERT INTO conversations (session_id, query, answer, created_at)
+                    VALUES (%s, %s, %s, NOW())
+                """, (session_id, question, answer))
+            
+            history = self._fetch_recent_history(session_id, session_trace)
+            
             self.mysql_client.cursor.execute("""
                 DELETE FROM conversations
                 WHERE session_id = %s AND id NOT IN (
@@ -168,99 +194,89 @@ class IntegratedQASystem:
                     ) AS sub
                 )
             """, (session_id, session_id, 5))
-            # 提交事务
+            
             self.mysql_client.connect.commit()
-            # 记录更新成功的日志
             self.logger.info(f"会话 {session_id} 历史更新成功")
-            # 返回更新后的历史
+            
+            if mysql_trace:
+                mysql_trace.end(content="会话历史更新成功", affected_rows=1)
+            
             return history
         except pymysql.MySQLError as e:
-            # 记录数据库操作失败的错误日志
             self.logger.error(f"更新会话历史失败: {e}")
-            # 回滚事务
             self.mysql_client.connect.rollback()
-            # 抛出异常
+            if mysql_trace:
+                mysql_trace.end(error=str(e))
             raise
         except Exception as e:
-            # 记录意外错误的日志
             self.logger.error(f"更新会话历史意外错误: {e}")
-            # 回滚事务
             self.mysql_client.connect.rollback()
-            # 抛出异常
+            if mysql_trace:
+                mysql_trace.end(error=str(e))
             raise
 
     def clear_session_history(self, session_id: str) -> bool:
         """清除指定会话历史"""
         try:
-            # 删除指定 session_id 的所有对话记录
             self.mysql_client.cursor.execute("""
                 DELETE FROM conversations
                 WHERE session_id = %s
             """, (session_id,))
-            # 提交事务
             self.mysql_client.connect.commit()
-            # 记录清除成功的日志
             self.logger.info(f"会话 {session_id} 历史已清除")
-            # 返回 True 表示成功
             return True
         except pymysql.MySQLError as e:
-            # 记录清除失败的错误日志
             self.logger.error(f"清除会话历史失败: {e}")
-            # 回滚事务
             self.mysql_client.connect.rollback()
-            # 返回 False 表示失败
             return False
 
     def query(self, query, source_filter=None, session_id=None):
-        """查询集成系统，支持对话历史和流式输出"""
-        start_time = time.time()  # 记录查询开始时间
-        # 记录查询信息到日志
-        self.logger.info(f"处理查询: '{query}' (会话ID: {session_id})")
-        # 获取对话历史，若无 session_id 则返回空列表
-        history = self.get_session_history(session_id) if session_id else []
-        # 执行 BM25 搜索，获取答案和是否需要 RAG 的标志
-        answer, need_rag = self.bm25_search.search(query, threshold=0.85)
-        if answer:
-            # 如果找到可靠答案，记录答案到日志
-            self.logger.info(f"MySQL答案: {answer}")
-            if session_id:
-                # 更新对话历史
-                self.update_session_history(session_id, query, answer)
-            # 计算处理时间
-            processing_time = time.time() - start_time
-            # 记录处理时间到日志
-            self.logger.info(f"查询处理耗时 {processing_time:.2f}秒")
-            # 一次性返回答案，标记为完整
-            yield answer, True
-        elif need_rag:
-            # 如果需要 RAG，记录回退信息到日志
-            self.logger.info("无可靠MySQL答案，回退到RAG")
-            # 初始化收集完整答案的字符串
-            collected_answer = ""
-            # 从 RAG 系统获取流式输出
-            for token in self.rag_system.generate_answer(query, source_filter=source_filter, history=history):
-                # 累积答案
-                collected_answer += token
-                # 逐 token 返回，标记为部分答案
-                yield token, False
-            if session_id:
-                # 更新对话历史，存储完整答案
-                self.update_session_history(session_id, query, collected_answer)
-            # 计算处理时间
-            processing_time = time.time() - start_time
-            # 记录处理时间到日志
-            self.logger.info(f"查询处理耗时 {processing_time:.2f}秒")
-            # 返回空字符串，标记流结束
-            yield "", True
-        else:
-            # 如果无答案，记录信息到日志
-            self.logger.info("未找到答案")
-            # 计算处理时间
-            processing_time = time.time() - start_time
-            # 记录处理时间到日志
-            self.logger.info(f"查询处理耗时 {processing_time:.2f}秒")
-            # 一次性返回默认答案，标记为完整
-            yield "未找到答案", True
+        """查询集成系统，支持对话历史、流式输出和执行链路追踪"""
+        session_trace = SessionTrace(user_query=query)
+        
+        try:
+            self.logger.info(f"处理查询: '{query}' (会话ID: {session_id})")
+            
+            history = self.get_session_history(session_id, session_trace) if session_id else []
+            
+            with TraceContext(session_trace, 'redis', key=f"bm25:{query}", operation_type="search") as redis_trace:
+                answer, need_rag = self.bm25_search.search(query, threshold=0.85)
+                redis_trace.end(content=f"BM25搜索完成", result_size=1 if answer else 0)
+            
+            if answer:
+                self.logger.info(f"MySQL答案: {answer}")
+                session_trace.finalize(final_answer=answer)
+                
+                if session_id:
+                    self.update_session_history(session_id, query, answer, session_trace, session_trace.to_compact_json())
+                
+                self.logger.info(f"查询处理耗时 {session_trace.total_duration_ms}ms")
+                yield answer, True, session_trace
+            elif need_rag:
+                self.logger.info("无可靠MySQL答案，回退到RAG")
+                collected_answer = ""
+                
+                for token in self.rag_system.generate_answer(query, source_filter=source_filter, session_trace=session_trace):
+                    collected_answer += token
+                    yield token, False, None
+                
+                session_trace.finalize(final_answer=collected_answer)
+                
+                if session_id:
+                    self.update_session_history(session_id, query, collected_answer, session_trace, session_trace.to_compact_json())
+                
+                self.logger.info(f"查询处理耗时 {session_trace.total_duration_ms}ms")
+                yield "", True, session_trace
+            else:
+                self.logger.info("未找到答案")
+                session_trace.finalize(final_answer="未找到答案")
+                self.logger.info(f"查询处理耗时 {session_trace.total_duration_ms}ms")
+                yield "未找到答案", True, session_trace
+                
+        except Exception as e:
+            self.logger.error(f"查询处理异常: {e}")
+            session_trace.finalize(final_answer="", error=str(e))
+            yield f"处理查询时发生错误: {e}", True, session_trace
 
 
 def main():
