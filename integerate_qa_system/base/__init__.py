@@ -13,12 +13,3 @@ if project_root not in sys.path:
 
 from config import Config
 from logger import logger
-from trace_models import (
-    BaseTrace, 
-    RedisTrace, 
-    MysqlTrace, 
-    MilvusTrace, 
-    LlmTrace, 
-    SessionTrace, 
-    TraceContext
-)

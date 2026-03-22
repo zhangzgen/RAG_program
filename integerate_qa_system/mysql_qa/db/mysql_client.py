@@ -74,6 +74,7 @@ class MysqlClient(object):
                     session_id VARCHAR(100) NOT NULL COMMENT '会话ID，关联 user_session 表',
                     query TEXT NOT NULL,
                     answer TEXT NOT NULL,
+                    trace_data TEXT NULL COMMENT '系统执行链路JSON数据',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NULL,
                     INDEX idx_session_id (session_id),
                     CONSTRAINT fk_conversations_session_id FOREIGN KEY (session_id) REFERENCES user_session (session_id) ON DELETE CASCADE ON UPDATE CASCADE
@@ -82,6 +83,22 @@ class MysqlClient(object):
             
             self.connect.commit()
             logger.info('用户表、会话表和对话记录表创建成功')
+            
+            # 检查并添加/修改 trace_data 字段
+            self.cursor.execute("SHOW COLUMNS FROM conversations LIKE 'trace_data'")
+            result = self.cursor.fetchone()
+            if not result:
+                self.cursor.execute('ALTER TABLE conversations ADD COLUMN trace_data TEXT NULL COMMENT "系统执行链路JSON数据" AFTER answer')
+                self.connect.commit()
+                logger.info('conversations表添加trace_data字段成功')
+            else:
+                # 检查字段类型，如果是VARCHAR则修改为TEXT
+                self.cursor.execute("SHOW COLUMNS FROM conversations WHERE Field='trace_data'")
+                col_info = self.cursor.fetchone()
+                if col_info and 'varchar' in str(col_info[1]).lower():
+                    self.cursor.execute('ALTER TABLE conversations MODIFY COLUMN trace_data TEXT NULL COMMENT "系统执行链路JSON数据"')
+                    self.connect.commit()
+                    logger.info('conversations表trace_data字段类型已修改为TEXT')
         except pymysql.MySQLError as e:
             logger.error(f'表创建失败: {e}')
             raise
