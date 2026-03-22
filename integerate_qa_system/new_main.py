@@ -147,10 +147,9 @@ class IntegratedQASystem:
         # 调用 _fetch_recent_history 获取对话历史
         return self._fetch_recent_history(session_id)
 
-    def update_session_history(self, session_id: str, question: str, answer: str, trace_data: str = None) -> list:
-        """更新会话历史到MySQL，保留最近5轮对话"""
+    def update_session_history(self, session_id: str, question: str, answer: str, trace_data: str = None) -> dict:
+        """更新会话历史到MySQL，保留最近5轮对话，返回包含conversation_id的字典"""
         try:
-            # 插入新的对话记录
             if trace_data:
                 self.mysql_client.cursor.execute("""
                     INSERT INTO conversations (session_id, query, answer, trace_data, created_at)
@@ -161,9 +160,10 @@ class IntegratedQASystem:
                     INSERT INTO conversations (session_id, query, answer, created_at)
                     VALUES (%s, %s, %s, NOW())
                 """, (session_id, question, answer))
-            # 获取更新后的对话历史
+            
+            conversation_id = self.mysql_client.cursor.lastrowid
+            
             history = self._fetch_recent_history(session_id)
-            # 删除超出 5 轮的旧记录
             self.mysql_client.cursor.execute("""
                 DELETE FROM conversations
                 WHERE session_id = %s AND id NOT IN (
@@ -176,21 +176,14 @@ class IntegratedQASystem:
                     ) AS sub
                 )
             """, (session_id, session_id, 5))
-            # 提交事务
             self.mysql_client.connect.commit()
-            # 记录更新成功的日志
-            self.logger.info(f"会话 {session_id} 历史更新成功")
-            # 返回更新后的历史
-            return history
+            self.logger.info(f"会话 {session_id} 历史更新成功, conversation_id: {conversation_id}")
+            return {'history': history, 'conversation_id': conversation_id}
         except pymysql.MySQLError as e:
-            # 记录数据库操作失败的错误日志
             self.logger.error(f"更新会话历史失败: {e}")
-            # 回滚事务
             self.mysql_client.connect.rollback()
-            # 抛出异常
             raise
         except Exception as e:
-            # 记录意外错误的日志
             self.logger.error(f"更新会话历史意外错误: {e}")
             # 回滚事务
             self.mysql_client.connect.rollback()
@@ -244,9 +237,11 @@ class IntegratedQASystem:
                 trace.finish(answer=answer, source='fqa')
                 
                 self.logger.info(f"FQA答案: {answer}")
+                conversation_id = None
                 if session_id:
-                    self.update_session_history(session_id, query, answer, trace.to_json())
-                yield answer, True
+                    result = self.update_session_history(session_id, query, answer, trace.to_json())
+                    conversation_id = result.get('conversation_id')
+                yield answer, True, conversation_id
                 return
             else:
                 trace.fqa.matched = False
@@ -304,9 +299,11 @@ class IntegratedQASystem:
                 yield collected_answer, True
             
             trace.finish(answer=collected_answer, source='llm_direct')
+            conversation_id = None
             if session_id:
-                self.update_session_history(session_id, query, collected_answer, trace.to_json())
-            yield "", True
+                result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
+                conversation_id = result.get('conversation_id')
+            yield "", True, conversation_id
             return
         
         # ===== Step 3: 检索策略选择 =====
@@ -393,10 +390,12 @@ class IntegratedQASystem:
         # 完成trace
         trace.finish(answer=collected_answer, source='rag')
         
+        conversation_id = None
         if session_id:
-            self.update_session_history(session_id, query, collected_answer, trace.to_json())
+            result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
+            conversation_id = result.get('conversation_id')
         
-        yield "", True
+        yield "", True, conversation_id
 
 
 def main():

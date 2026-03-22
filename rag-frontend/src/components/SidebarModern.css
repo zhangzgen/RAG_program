@@ -309,13 +309,17 @@
   min-height: 26px;
 }
 
-.session-item-modern:hover {
+.session-item-modern:hover:not(.active) {
   background: #f3f4f6;
 }
 
 .session-item-modern.active {
   background: #eef2ff !important;
   box-shadow: inset 3px 0 0 #5534DA;
+}
+
+.session-item-modern.active:hover {
+  background: #e0e7ff !important;
 }
 
 .session-icon-modern {
@@ -331,7 +335,7 @@
   transition: all 0.2s ease;
 }
 
-.session-item-modern:hover .session-icon-modern {
+.session-item-modern:hover:not(.active) .session-icon-modern {
   background: #e5e7eb;
 }
 

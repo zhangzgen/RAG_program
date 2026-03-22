@@ -275,33 +275,35 @@ async def handle_query(request: Request, user: dict = Depends(get_current_user))
     # 定义一个生成器函数，用于流式返回答案（逐 token 输出）
     def generate_response():
         try:
-            # 调用问答系统的核心 query 方法，返回生成器（每次产出一个 token）
-            for token, is_complete in qa_system.query(
+            for item in qa_system.query(
                 query=query,
                 source_filter=source_filter,
                 session_id=session_id
             ):
-                # 构造要返回的 JSON 消息，包含当前文本片段和状态
+                if len(item) == 3:
+                    token, is_complete, conversation_id = item
+                else:
+                    token, is_complete = item
+                    conversation_id = None
+                
                 message = {
-                    "token": token,           # 当前生成的文本（如一个字）
-                    "is_complete": is_complete,     # 是否是最后一个 token
-                    "session_id": session_id        # 返回会话 ID，便于前端维护
+                    "token": token,
+                    "is_complete": is_complete,
+                    "session_id": session_id
                 }
-                # 使用 SSE 格式：data: {json}\n\n
-                # ensure_ascii=False 确保中文不被转义为 \uXXXX
+                
+                if is_complete and conversation_id:
+                    message["conversation_id"] = conversation_id
+                
                 yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
-        # 捕获问答系统内部任何异常（如数据库错误、LLM 调用失败）
         except Exception as e:
-            # 记录错误日志
             error_msg = f"处理查询时发生错误: {str(e)}"
             qa_system.logger.error(error_msg)
-            # 构造错误消息，标记流结束
             message = {
-                "error": error_msg,          # 错误信息
-                "is_complete": True          # 表示流已结束
+                "error": error_msg,
+                "is_complete": True
             }
-            # 同样以 SSE 格式返回错误
             yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
     # 返回流式响应，媒体类型为 text/event-stream（SSE 标准）

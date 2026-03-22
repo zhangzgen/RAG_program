@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { getSessions, deleteSession, getSessionConversations, getCategories, getCategoryFiles } from '../api';
 import './SidebarModern.css';
 import sideBarIcon from '/side_bar.svg';
@@ -154,6 +154,15 @@ const SidebarModern = forwardRef(({
 
   const getSessionTitle = (session) => `对话 ${session.session_id.slice(0, 8)}`;
 
+  const sortedSessions = useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
+    return [...sessions].sort((a, b) => {
+      const timeA = a.last_active ? new Date(a.last_active).getTime() : 0;
+      const timeB = b.last_active ? new Date(b.last_active).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [sessions]);
+
   const formatTime = (timestamp) => {
     if (!timestamp) return '刚刚';
     const date = new Date(timestamp);
@@ -251,16 +260,10 @@ const SidebarModern = forwardRef(({
               <div className="loading-spinner-modern"></div>
             </div>
           ) : mode === 'qa' ? (
-            sessions.length === 0 ? (
+            sortedSessions.length === 0 ? (
               !isCollapsed && <div className="empty-state-modern">暂无历史对话</div>
             ) : (
-              [...sessions].sort((a, b) => {
-                if (a.session_id === currentSessionId) return -1;
-                if (b.session_id === currentSessionId) return 1;
-                const timeA = a.last_active ? new Date(a.last_active).getTime() : 0;
-                const timeB = b.last_active ? new Date(b.last_active).getTime() : 0;
-                return timeB - timeA;
-              }).map((session) => (
+              sortedSessions.map((session) => (
                 <div
                   key={session.session_id}
                   className={`session-item-modern ${currentSessionId === session.session_id ? 'active' : ''}`}

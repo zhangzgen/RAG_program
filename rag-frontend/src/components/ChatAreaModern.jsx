@@ -142,6 +142,8 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     const userMsgId = generateMessageId();
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: userMessage }]);
     setIsLoading(true);
+    
+    let isNewSession = false;
 
     try {
       let currentSessionId = sessionId;
@@ -150,9 +152,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
         currentSessionId = sessionResponse.session_id;
         setSessionId(currentSessionId);
         setSessionCreated(true);
-        if (onSessionCreated) {
-          onSessionCreated(currentSessionId);
-        }
+        isNewSession = true;
       }
 
       const assistantMsgIndex = userMsgIndex + 1;
@@ -166,6 +166,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       const decoder = new TextDecoder();
       
       let buffer = '';
+      let streamComplete = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -188,6 +189,18 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
               }
               if (data.is_complete) {
                 setIsLoading(false);
+                if (data.conversation_id) {
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    if (newMessages[assistantMsgIndex]) {
+                      newMessages[assistantMsgIndex] = {
+                        ...newMessages[assistantMsgIndex],
+                        conversationId: data.conversation_id
+                      };
+                    }
+                    return newMessages;
+                  });
+                }
               }
             } catch (e) {
               console.error('Error parsing SSE data:', e);
@@ -215,10 +228,27 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
           }
           if (data.is_complete) {
             setIsLoading(false);
+            streamComplete = true;
+            if (data.conversation_id) {
+              setMessages(prev => {
+                const newMessages = [...prev];
+                if (newMessages[assistantMsgIndex]) {
+                  newMessages[assistantMsgIndex] = {
+                    ...newMessages[assistantMsgIndex],
+                    conversationId: data.conversation_id
+                  };
+                }
+                return newMessages;
+              });
+            }
           }
         } catch (e) {
           console.error('Error parsing remaining buffer:', e);
         }
+      }
+      
+      if (streamComplete && onSessionCreated) {
+        onSessionCreated(currentSessionId);
       }
       
     } catch (error) {
