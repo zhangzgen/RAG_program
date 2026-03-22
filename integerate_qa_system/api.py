@@ -1257,6 +1257,55 @@ async def get_raw_config(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"获取原始配置失败: {str(e)}")
 
 
+def parse_config_content(content):
+    """解析配置文件内容为字典"""
+    import re
+    result = {}
+    current_section = None
+    
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        
+        section_match = re.match(r'^\[(\w+)\]$', line)
+        if section_match:
+            current_section = section_match.group(1)
+            result[current_section] = {}
+            continue
+        
+        if current_section:
+            kv_match = re.match(r'^(.+?)\s*=\s*(.*)$', line)
+            if kv_match:
+                key = kv_match.group(1).strip()
+                value = kv_match.group(2).strip()
+                result[current_section][key] = value
+    
+    return result
+
+
+def compare_configs(old_config, new_config):
+    """比较两个配置，返回变更的配置项列表"""
+    changed = []
+    
+    all_sections = set(old_config.keys()) | set(new_config.keys())
+    
+    for section in all_sections:
+        old_section = old_config.get(section, {})
+        new_section = new_config.get(section, {})
+        
+        all_keys = set(old_section.keys()) | set(new_section.keys())
+        
+        for key in all_keys:
+            old_value = old_section.get(key)
+            new_value = new_section.get(key)
+            
+            if old_value != new_value:
+                changed.append((section, key))
+    
+    return changed
+
+
 class ConfigUpdateRequest(BaseModel):
     config_content: str
     change_description: str = ""
@@ -1270,6 +1319,14 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
     """
     try:
         config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            old_content = f.read()
+        
+        old_config = parse_config_content(old_content)
+        new_config = parse_config_content(request.config_content)
+        
+        changed_items = compare_configs(old_config, new_config)
         
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(request.config_content)
@@ -1285,16 +1342,23 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
         )
         
         from base.config import Config
-        reload_result = Config.hot_reload()
+        Config.hot_reload()
         
-        reloaded_items = reload_result['reloaded']
-        not_reloaded_items = reload_result['not_reloaded']
+        reloaded_items = []
+        not_reloaded_items = []
+        
+        for section, key in changed_items:
+            item_name = f"{section}.{key}"
+            if section in ['llm', 'retrieval', 'app', 'email', 'jwt']:
+                reloaded_items.append(item_name)
+            else:
+                not_reloaded_items.append(item_name)
         
         reload_messages = []
         if reloaded_items:
-            reload_messages.append(f"以下 {len(reloaded_items)} 项配置已热加载成功: {', '.join(reloaded_items[:5])}{'...' if len(reloaded_items) > 5 else ''}")
+            reload_messages.append(f"以下 {len(reloaded_items)} 项配置已热加载成功")
         if not_reloaded_items:
-            reload_messages.append(f"以下 {len(not_reloaded_items)} 项配置需要重启后端服务才能生效: {', '.join(not_reloaded_items[:3])}{'...' if len(not_reloaded_items) > 3 else ''}")
+            reload_messages.append(f"以下 {len(not_reloaded_items)} 项配置需要重启后端服务才能生效")
         
         return {
             'success': True,
@@ -1303,8 +1367,8 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
             'hot_reload': {
                 'reloaded': reloaded_items,
                 'not_reloaded': not_reloaded_items,
-                'reloaded_count': reload_result['reloaded_count'],
-                'not_reloaded_count': reload_result['not_reloaded_count'],
+                'reloaded_count': len(reloaded_items),
+                'not_reloaded_count': len(not_reloaded_items),
                 'messages': reload_messages
             }
         }
@@ -1361,16 +1425,32 @@ async def rollback_config(version_id: int, user: dict = Depends(get_current_user
             raise HTTPException(status_code=404, detail="版本不存在")
         
         config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            old_content = f.read()
+        
+        old_config = parse_config_content(old_content)
+        new_config = parse_config_content(version['config_content'])
+        
+        changed_items = compare_configs(old_config, new_config)
+        
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(version['config_content'])
         
         rollback_result = qa_system.mysql_client.rollback_config(version_id)
         
         from base.config import Config
-        reload_result = Config.hot_reload()
+        Config.hot_reload()
         
-        reloaded_items = reload_result['reloaded']
-        not_reloaded_items = reload_result['not_reloaded']
+        reloaded_items = []
+        not_reloaded_items = []
+        
+        for section, key in changed_items:
+            item_name = f"{section}.{key}"
+            if section in ['llm', 'retrieval', 'app', 'email', 'jwt']:
+                reloaded_items.append(item_name)
+            else:
+                not_reloaded_items.append(item_name)
         
         reload_messages = []
         if reloaded_items:
@@ -1385,8 +1465,8 @@ async def rollback_config(version_id: int, user: dict = Depends(get_current_user
             'hot_reload': {
                 'reloaded': reloaded_items,
                 'not_reloaded': not_reloaded_items,
-                'reloaded_count': reload_result['reloaded_count'],
-                'not_reloaded_count': reload_result['not_reloaded_count'],
+                'reloaded_count': len(reloaded_items),
+                'not_reloaded_count': len(not_reloaded_items),
                 'messages': reload_messages
             }
         }
