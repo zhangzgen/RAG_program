@@ -217,6 +217,13 @@ export const vectorSearch = async (query, sourceFilter = null, topK = 5) => {
   return response.data;
 };
 
+export const getVectorDetail = async (vectorId) => {
+  const response = await api.post('/knowledge/vector/detail', {
+    vector_id: vectorId,
+  });
+  return response.data;
+};
+
 export const getKnowledgeSources = async () => {
   const response = await api.get('/knowledge/sources');
   return response.data;
@@ -387,4 +394,23 @@ export const getCases = async (status, page = 1, pageSize = 20) => {
 export const getCaseDetail = async (conversationId) => {
   const response = await api.get(`/cases/${conversationId}`);
   return response.data;
+};
+
+export const downloadCases = async (status) => {
+  const response = await api.get('/cases/download', {
+    params: { status },
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], { type: 'application/json' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = status === 1 ? 'good_cases.json' : 'bad_cases.json';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return true;
 };

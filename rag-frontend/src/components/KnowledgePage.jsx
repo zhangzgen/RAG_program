@@ -497,6 +497,10 @@ const KnowledgePage = () => {
                     <div className="result-header">
                       <span className="result-index">#{index + 1}</span>
                       <span className="result-source">{result.source}</span>
+                      {result.score !== null && result.score !== undefined && (
+                        <span className="result-score">置信度: {typeof result.score === 'number' ? result.score.toFixed(4) : result.score}</span>
+                      )}
+                      <span className="result-expand-hint">{expandedResult === result.id ? '▼ 收起' : '▶ 展开'}</span>
                     </div>
                     <div className="result-content">
                       {expandedResult === result.id 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getCases, getCaseDetail } from '../api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getCases, getCaseDetail, getVectorDetail, downloadCases } from '../api';
 import './CasePage.css';
 
 const CasePage = () => {
@@ -10,13 +10,12 @@ const CasePage = () => {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [selectedCase, setSelectedCase] = useState(null);
+  const [downloading, setDownloading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
+  const [expandedResult, setExpandedResult] = useState(null);
+  const [vectorDetails, setVectorDetails] = useState({});
 
-  useEffect(() => {
-    loadCases();
-  }, [activeTab, page]);
-
-  const loadCases = async () => {
+  const loadCases = useCallback(async () => {
     try {
       setLoading(true);
       const status = activeTab === 'good' ? 1 : 2;
@@ -28,7 +27,11 @@ const CasePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, page, pageSize]);
+
+  useEffect(() => {
+    loadCases();
+  }, [loadCases]);
 
   const handleCaseClick = async (caseItem) => {
     try {
@@ -37,6 +40,18 @@ const CasePage = () => {
       setExpandedSections({});
     } catch (error) {
       console.error('获取Case详情失败:', error);
+    }
+  };
+
+  const handleDownloadCases = async () => {
+    try {
+      setDownloading(true);
+      const status = activeTab === 'good' ? 1 : 2;
+      await downloadCases(status);
+    } catch (error) {
+      console.error('下载Case数据失败:', error);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -51,7 +66,7 @@ const CasePage = () => {
     if (!traceDataStr) return null;
     try {
       return JSON.parse(traceDataStr);
-    } catch (e) {
+    } catch {
       return null;
     }
   };
@@ -101,6 +116,94 @@ const CasePage = () => {
     return labels[name] || name;
   };
 
+  const handleResultExpand = async (result, index) => {
+    const resultKey = `trace-result-${index}`;
+    
+    if (expandedResult === resultKey) {
+      setExpandedResult(null);
+      return;
+    }
+    
+    setExpandedResult(resultKey);
+    
+    if (result.id && !vectorDetails[result.id]) {
+      try {
+        const response = await getVectorDetail(result.id);
+        if (response.success && response.data) {
+          setVectorDetails(prev => ({
+            ...prev,
+            [result.id]: response.data
+          }));
+        }
+      } catch (error) {
+        console.error('获取向量详情失败:', error);
+      }
+    }
+  };
+
+  const renderRetrievalResults = (results) => {
+    if (!results || !Array.isArray(results) || results.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="retrieval-results-container">
+        <div className="retrieval-results-header">
+          <span className="retrieval-results-count">{results.length} 条检索结果</span>
+        </div>
+        <div className="retrieval-results-list">
+          {results.map((result, index) => {
+            const vectorDetail = result.id ? vectorDetails[result.id] : null;
+            const parentContent = vectorDetail?.parent_content || result.parent_content;
+            const fullContent = vectorDetail?.text || result.full_content || result.content;
+            
+            return (
+              <div 
+                key={index} 
+                className={`retrieval-result-item ${expandedResult === `trace-result-${index}` ? 'expanded' : ''}`}
+                onClick={() => handleResultExpand(result, index)}
+              >
+                <div className="retrieval-result-header">
+                  <span className="retrieval-result-index">#{index + 1}</span>
+                  <span className="retrieval-result-source">{result.source || '未知来源'}</span>
+                  {result.score !== null && result.score !== undefined && (
+                    <span className="retrieval-result-score">置信度: {typeof result.score === 'number' ? result.score.toFixed(4) : result.score}</span>
+                  )}
+                  <span className="retrieval-expand-hint">{expandedResult === `trace-result-${index}` ? '▼ 收起' : '▶ 展开'}</span>
+                </div>
+                <div className="retrieval-result-content">
+                  {expandedResult === `trace-result-${index}` 
+                    ? fullContent
+                    : result.content && result.content.length > 100 
+                      ? result.content.substring(0, 100) + '...' 
+                      : result.content || ''
+                  }
+                </div>
+                {expandedResult === `trace-result-${index}` && (
+                  <>
+                    {parentContent && (
+                      <div className="retrieval-result-parent">
+                        <div className="parent-label">父文档：</div>
+                        <div className="parent-content">{parentContent}</div>
+                      </div>
+                    )}
+                    {(vectorDetail?.file_path || result.file_path) && (
+                      <div className="retrieval-result-trace">
+                        <span className="retrieval-file-path" title={vectorDetail?.file_path || result.file_path}>
+                          📂 {(vectorDetail?.file_path || result.file_path).split('/').pop().split('\\').pop()}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderTraceDetails = (data) => {
     const fields = [
       { key: 'input', label: '输入' },
@@ -112,7 +215,6 @@ const CasePage = () => {
       { key: 'score', label: '分数' },
       { key: 'matched', label: '是否匹配' },
       { key: 'model', label: '模型' },
-      { key: 'results', label: '检索结果' },
       { key: 'total_results', label: '结果数量' }
     ];
 
@@ -135,6 +237,12 @@ const CasePage = () => {
             </div>
           );
         })}
+        {data.results && Array.isArray(data.results) && data.results.length > 0 && (
+          <div className="trace-detail-item">
+            <span className="trace-detail-label">检索结果:</span>
+            {renderRetrievalResults(data.results)}
+          </div>
+        )}
       </div>
     );
   };
@@ -146,7 +254,7 @@ const CasePage = () => {
       <div className="case-header">
         <h2>Case分析</h2>
         <div className="case-tabs">
-          <button 
+          <button
             className={`case-tab ${activeTab === 'good' ? 'active' : ''}`}
             onClick={() => { setActiveTab('good'); setPage(1); }}
           >
@@ -154,13 +262,20 @@ const CasePage = () => {
             GoodCase
             <span className="tab-count">{activeTab === 'good' ? total : ''}</span>
           </button>
-          <button 
+          <button
             className={`case-tab ${activeTab === 'bad' ? 'active' : ''}`}
             onClick={() => { setActiveTab('bad'); setPage(1); }}
           >
             <span className="tab-icon">👎</span>
             BadCase
             <span className="tab-count">{activeTab === 'bad' ? total : ''}</span>
+          </button>
+          <button
+            className="pagination-btn"
+            onClick={handleDownloadCases}
+            disabled={downloading}
+          >
+            {downloading ? '下载中...' : '下载 JSON'}
           </button>
         </div>
       </div>

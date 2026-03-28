@@ -334,11 +334,15 @@ class IntegratedQASystem:
             # 记录检索结果
             results = []
             for doc in context_docs:
+                metadata = getattr(doc, 'metadata', {})
                 results.append({
+                    'id': metadata.get('id', None),
                     'content': doc.page_content[:200] + '...' if len(doc.page_content) > 200 else doc.page_content,
-                    'score': getattr(doc, 'metadata', {}).get('rerank_score', None),
-                    'source': getattr(doc, 'metadata', {}).get('source', None),
-                    'file_path': getattr(doc, 'metadata', {}).get('file_path', None)
+                    'full_content': doc.page_content,
+                    'score': metadata.get('rerank_score', None),
+                    'source': metadata.get('source', None),
+                    'file_path': metadata.get('file_path', None),
+                    'parent_content': metadata.get('parent_content', None)
                 })
             trace.vector_retrieval.results = results
             trace.vector_retrieval.total_results = len(context_docs)

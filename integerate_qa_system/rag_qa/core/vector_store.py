@@ -222,11 +222,15 @@ class VectorStore:
                 seen_parent_ids.add(parent_id)
         
         if len(unique_results) < 2:
+            for i, doc in enumerate(unique_results[:conf.CANDIDATE_M]):
+                doc.metadata['rerank_score'] = 1.0 if i == 0 else 0.5
             return unique_results[:conf.CANDIDATE_M]
         
         if unique_results:
             pairs = [[query, doc.page_content] for doc in unique_results]
             scores = self.reranker.predict(pairs)
+            for i, (score, doc) in enumerate(zip(scores, unique_results)):
+                doc.metadata['rerank_score'] = float(score)
             ranked_results = [doc for _, doc in sorted(zip(scores, unique_results), reverse=True)]
         else:
             ranked_results = []
@@ -275,6 +279,7 @@ class VectorStore:
         return Document(
             page_content=hit.get("text"),
             metadata={
+                "id": hit.get("id"),
                 "parent_id": hit.get("parent_id"),
                 "parent_content": hit.get("parent_content"),
                 "source": hit.get("source"),
@@ -282,6 +287,41 @@ class VectorStore:
                 "file_path": hit.get("file_path"),
             }
         )
+
+    def get_vector_by_id(self, vector_id):
+        """
+        根据向量ID查询单个向量
+        
+        Args:
+            vector_id: 向量ID
+            
+        Returns:
+            dict: 向量信息，包含 text, parent_content, source, file_path 等
+        """
+        try:
+            filter_expr = f'id == "{vector_id}"'
+            results = self.client.query(
+                collection_name=self.collection_name,
+                filter=filter_expr,
+                output_fields=["id", "text", "parent_id", "parent_content", "source", "timestamp", "file_path"],
+                limit=1
+            )
+            
+            if results:
+                hit = results[0]
+                return {
+                    'id': hit.get('id', ''),
+                    'text': hit.get('text', ''),
+                    'parent_id': hit.get('parent_id', ''),
+                    'parent_content': hit.get('parent_content', ''),
+                    'source': hit.get('source', ''),
+                    'timestamp': hit.get('timestamp', ''),
+                    'file_path': hit.get('file_path', ''),
+                }
+            return None
+        except Exception as e:
+            self.logger.error(f'查询向量ID {vector_id} 失败: {e}')
+            return None
 
 
 if __name__ == '__main__':

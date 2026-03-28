@@ -523,6 +523,34 @@ async def get_cases(
         raise HTTPException(status_code=500, detail=f"获取Case列表失败: {str(e)}")
 
 
+@app.get("/cases/download")
+async def download_cases(
+    status: int = 1,
+    user: dict = Depends(get_current_user)
+):
+    """
+    批量下载Case数据为JSON文件
+    参数：
+        status: 状态值 (1-GoodCase, 2-BadCase)
+    """
+    from fastapi.responses import Response
+    if status not in [1, 2]:
+        raise HTTPException(status_code=400, detail="状态值必须为1(GoodCase)或2(BadCase)")
+    try:
+        total = qa_system.mysql_client.get_conversations_count_by_status(status)
+        cases = qa_system.mysql_client.get_conversations_by_status(status, limit=total if total > 0 else 1)
+        filename = "good_cases.json" if status == 1 else "bad_cases.json"
+        content = json.dumps(cases, ensure_ascii=False, indent=2, default=str)
+        return Response(
+            content=content.encode("utf-8"),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except Exception as e:
+        qa_system.logger.error(f"下载Case数据失败: {e}")
+        raise HTTPException(status_code=500, detail=f"下载Case数据失败: {str(e)}")
+
+
 @app.get("/cases/{conversation_id}")
 async def get_case_detail(
     conversation_id: int,
@@ -1006,15 +1034,16 @@ async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_c
         )
         
         search_results = []
-        for i, doc in enumerate(results):
+        for doc in results:
             search_results.append({
-                'id': i + 1,
+                'id': doc.metadata.get('id', ''),
                 'content': doc.page_content,
                 'parent_content': doc.metadata.get('parent_content', ''),
                 'source': doc.metadata.get('source', 'unknown'),
                 'timestamp': doc.metadata.get('timestamp', ''),
                 'file_path': doc.metadata.get('file_path', ''),
                 'parent_id': doc.metadata.get('parent_id', ''),
+                'score': doc.metadata.get('rerank_score', None),
             })
         
         return {
@@ -1028,6 +1057,35 @@ async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_c
     except Exception as e:
         qa_system.logger.error(f"向量检索失败: {e}")
         raise HTTPException(status_code=500, detail=f"向量检索失败: {str(e)}")
+
+
+class VectorIdRequest(BaseModel):
+    vector_id: str
+
+
+@app.post("/knowledge/vector/detail")
+async def get_vector_detail(request: VectorIdRequest, user: dict = Depends(get_current_user)):
+    """
+    根据向量ID获取向量详情
+    """
+    try:
+        if not request.vector_id or not request.vector_id.strip():
+            raise HTTPException(status_code=400, detail="向量ID不能为空")
+        
+        vector_info = qa_system.vector_store.get_vector_by_id(request.vector_id.strip())
+        
+        if not vector_info:
+            raise HTTPException(status_code=404, detail="向量不存在")
+        
+        return {
+            'success': True,
+            'data': vector_info
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"查询向量详情失败: {e}")
+        raise HTTPException(status_code=500, detail=f"查询向量详情失败: {str(e)}")
 
 
 @app.get("/knowledge/sources")
