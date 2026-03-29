@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import pymysql
 import pandas as pd
 
@@ -872,6 +873,54 @@ class MysqlClient(object):
             logger.error(f'配置版本表创建失败: {e}')
             raise
 
+    def create_assessment_tables(self):
+        """创建评估文件表和评估结果表"""
+        try:
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS assessment_file (
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '文件主键ID',
+                    file_id VARCHAR(100) NOT NULL COMMENT '文件唯一标识',
+                    file_name VARCHAR(255) NOT NULL COMMENT '原始文件名',
+                    file_path VARCHAR(500) NOT NULL COMMENT '文件路径',
+                    file_content LONGTEXT NULL COMMENT '原始文件内容',
+                    uploaded_by VARCHAR(255) NULL COMMENT '上传用户邮箱',
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+                    UNIQUE KEY uk_file_id (file_id),
+                    INDEX idx_uploaded_at (uploaded_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评估文件表'
+            ''')
+
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS assessment_result (
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '结果主键ID',
+                    result_id VARCHAR(100) NOT NULL COMMENT '结果唯一标识',
+                    file_id VARCHAR(100) NOT NULL COMMENT '关联文件ID',
+                    file_name VARCHAR(255) NOT NULL COMMENT '文件名冗余',
+                    total_questions INT NOT NULL DEFAULT 0 COMMENT '评估数据总条数',
+                    completed_questions INT NOT NULL DEFAULT 0 COMMENT '已评估条数',
+                    faithfulness DECIMAL(10, 6) NULL COMMENT '忠实度',
+                    answer_relevancy DECIMAL(10, 6) NULL COMMENT '答案相关性',
+                    context_precision DECIMAL(10, 6) NULL COMMENT '上下文精确率',
+                    context_recall DECIMAL(10, 6) NULL COMMENT '上下文召回率',
+                    status VARCHAR(20) NOT NULL DEFAULT 'running' COMMENT 'running/completed/failed',
+                    error_message TEXT NULL COMMENT '失败原因',
+                    result_content LONGTEXT NULL COMMENT '结果详情JSON',
+                    created_by VARCHAR(255) NULL COMMENT '执行用户邮箱',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    completed_at TIMESTAMP NULL NULL COMMENT '完成时间',
+                    UNIQUE KEY uk_result_id (result_id),
+                    INDEX idx_file_id (file_id),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评估结果表'
+            ''')
+
+            self.connect.commit()
+            logger.info('评估文件表和评估结果表创建成功')
+        except Exception as e:
+            logger.error(f'评估相关表创建失败: {e}')
+            self.connect.rollback()
+            raise
+
     def get_current_config(self):
         """
         获取当前配置内容
@@ -1003,17 +1052,17 @@ class MysqlClient(object):
     def get_config_by_id(self, version_id):
         """
         根据ID获取配置版本详情
-        
+
         Args:
             version_id: 版本ID
-            
+
         Returns:
             dict: 配置详情
         """
         try:
             self.cursor.execute('''
                 SELECT id, version, config_content, change_description, changed_by, created_at, is_active
-                FROM config_version 
+                FROM config_version
                 WHERE id = %s
             ''', (version_id,))
             result = self.cursor.fetchone()
@@ -1030,6 +1079,197 @@ class MysqlClient(object):
             return None
         except Exception as e:
             logger.error(f'获取配置版本详情失败: {e}')
+            return None
+
+    def save_assessment_file(self, file_id, file_name, file_path, file_content, uploaded_by=None):
+        try:
+            self.cursor.execute('''
+                INSERT INTO assessment_file (file_id, file_name, file_path, file_content, uploaded_by)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (file_id, file_name, file_path, file_content, uploaded_by))
+            self.connect.commit()
+            return True
+        except Exception as e:
+            logger.error(f'保存评估文件失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def get_assessment_files(self):
+        try:
+            self.cursor.execute('''
+                SELECT file_id, file_name, file_path, file_content, uploaded_by, uploaded_at
+                FROM assessment_file
+                ORDER BY uploaded_at DESC
+            ''')
+            rows = self.cursor.fetchall()
+            return [{
+                'file_id': row[0],
+                'file_name': row[1],
+                'file_path': row[2],
+                'file_content': row[3],
+                'uploaded_by': row[4],
+                'uploaded_at': str(row[5])
+            } for row in rows]
+        except Exception as e:
+            logger.error(f'获取评估文件列表失败: {e}')
+            return []
+
+    def get_assessment_file_by_id(self, file_id):
+        try:
+            self.cursor.execute('''
+                SELECT file_id, file_name, file_path, file_content, uploaded_by, uploaded_at
+                FROM assessment_file
+                WHERE file_id = %s
+                LIMIT 1
+            ''', (file_id,))
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            return {
+                'file_id': row[0],
+                'file_name': row[1],
+                'file_path': row[2],
+                'file_content': row[3],
+                'uploaded_by': row[4],
+                'uploaded_at': str(row[5])
+            }
+        except Exception as e:
+            logger.error(f'获取评估文件失败: {e}')
+            return None
+
+    def create_assessment_result(self, result_id, file_id, file_name, total_questions, created_by=None):
+        try:
+            self.cursor.execute('''
+                INSERT INTO assessment_result (result_id, file_id, file_name, total_questions, completed_questions, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (result_id, file_id, file_name, total_questions, 0, created_by))
+            self.connect.commit()
+            return True
+        except Exception as e:
+            logger.error(f'创建评估结果失败: {e}')
+            self.connect.rollback()
+            raise
+
+    def update_assessment_result_progress(self, result_id, completed_questions):
+        try:
+            self.cursor.execute('''
+                UPDATE assessment_result
+                SET completed_questions = %s
+                WHERE result_id = %s
+            ''', (completed_questions, result_id))
+            self.connect.commit()
+            return True
+        except Exception as e:
+            logger.error(f'更新评估进度失败: {e}')
+            self.connect.rollback()
+            return False
+
+    def complete_assessment_result(self, result_id, results, result_content=None):
+        try:
+            self.cursor.execute('''
+                UPDATE assessment_result
+                SET faithfulness = %s,
+                    answer_relevancy = %s,
+                    context_precision = %s,
+                    context_recall = %s,
+                    status = 'completed',
+                    result_content = %s,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE result_id = %s
+            ''', (
+                results.get('faithfulness'),
+                results.get('answer_relevancy'),
+                results.get('context_precision'),
+                results.get('context_recall'),
+                result_content,
+                result_id,
+            ))
+            self.connect.commit()
+            return True
+        except Exception as e:
+            logger.error(f'完成评估结果失败: {e}')
+            self.connect.rollback()
+            return False
+
+    def fail_assessment_result(self, result_id, error_message):
+        try:
+            self.cursor.execute('''
+                UPDATE assessment_result
+                SET status = 'failed',
+                    error_message = %s,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE result_id = %s
+            ''', (error_message, result_id))
+            self.connect.commit()
+            return True
+        except Exception as e:
+            logger.error(f'标记评估失败失败: {e}')
+            self.connect.rollback()
+            return False
+
+    def get_assessment_results(self, limit=50):
+        try:
+            self.cursor.execute('''
+                SELECT result_id, file_id, file_name, total_questions, completed_questions,
+                       faithfulness, answer_relevancy, context_precision, context_recall,
+                       status, error_message, created_by, created_at, completed_at
+                FROM assessment_result
+                ORDER BY created_at DESC
+                LIMIT %s
+            ''', (limit,))
+            rows = self.cursor.fetchall()
+            return [{
+                'result_id': row[0],
+                'file_id': row[1],
+                'file_name': row[2],
+                'total_questions': row[3],
+                'completed_questions': row[4],
+                'faithfulness': float(row[5]) if row[5] is not None else None,
+                'answer_relevancy': float(row[6]) if row[6] is not None else None,
+                'context_precision': float(row[7]) if row[7] is not None else None,
+                'context_recall': float(row[8]) if row[8] is not None else None,
+                'status': row[9],
+                'error_message': row[10],
+                'created_by': row[11],
+                'created_at': str(row[12]),
+                'completed_at': str(row[13]) if row[13] else None,
+            } for row in rows]
+        except Exception as e:
+            logger.error(f'获取评估结果列表失败: {e}')
+            return []
+
+    def get_assessment_result_by_id(self, result_id):
+        try:
+            self.cursor.execute('''
+                SELECT result_id, file_id, file_name, total_questions, completed_questions,
+                       faithfulness, answer_relevancy, context_precision, context_recall,
+                       status, error_message, result_content, created_by, created_at, completed_at
+                FROM assessment_result
+                WHERE result_id = %s
+                LIMIT 1
+            ''', (result_id,))
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            return {
+                'result_id': row[0],
+                'file_id': row[1],
+                'file_name': row[2],
+                'total_questions': row[3],
+                'completed_questions': row[4],
+                'faithfulness': float(row[5]) if row[5] is not None else None,
+                'answer_relevancy': float(row[6]) if row[6] is not None else None,
+                'context_precision': float(row[7]) if row[7] is not None else None,
+                'context_recall': float(row[8]) if row[8] is not None else None,
+                'status': row[9],
+                'error_message': row[10],
+                'result_content': json.loads(row[11]) if row[11] else None,
+                'created_by': row[12],
+                'created_at': str(row[13]),
+                'completed_at': str(row[14]) if row[14] else None,
+            }
+        except Exception as e:
+            logger.error(f'获取评估结果详情失败: {e}')
             return None
 
     def get_all_faqs(self, search_keyword=None):

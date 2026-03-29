@@ -5,6 +5,7 @@ import KnowledgePage from './components/KnowledgePage';
 import ConfigPage from './components/ConfigPage';
 import FqaPage from './components/FqaPage';
 import CasePage from './components/CasePage';
+import AssessmentPage from './components/AssessmentPage';
 import Login from './components/Login';
 import { verifyToken } from './api';
 import './AppModern.css';
@@ -191,8 +192,10 @@ function App() {
             <ConfigPage />
           ) : professionalTab === 'fqa' ? (
             <FqaPage />
-          ) : (
+          ) : professionalTab === 'case' ? (
             <CasePage />
+          ) : (
+            <AssessmentPage />
           )
         )}
       </div>

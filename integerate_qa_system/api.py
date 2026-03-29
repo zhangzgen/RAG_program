@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import uuid
 import os
+import datetime
 from typing import List, Optional
 from pydantic import BaseModel
 from new_main import IntegratedQASystem
@@ -1346,6 +1347,8 @@ async def startup_event():
         qa_system.logger.info("知识库表初始化完成")
         qa_system.mysql_client.create_config_version_table()
         qa_system.logger.info("配置版本表初始化完成")
+        qa_system.mysql_client.create_assessment_tables()
+        qa_system.logger.info("评估相关表初始化完成")
     except Exception as e:
         qa_system.logger.error(f"知识库表初始化失败: {e}")
 
@@ -1385,6 +1388,12 @@ async def get_config(user: dict = Depends(get_current_user)):
                 'model': config.LLM_MODEL,
                 'dashscope_api_key': '******',
                 'dashscope_base_url': config.DASHSCOPE_BASE_URL
+            },
+            'assessment': {
+                'llm_model': config.ASSESSMENT_LLM_MODEL,
+                'embedding_model': config.ASSESSMENT_EMBEDDING_MODEL,
+                'api_key': '******',
+                'base_url': config.ASSESSMENT_BASE_URL
             },
             'retrieval': {
                 'parent_chunk_size': config.PARENT_CHUNK_SIZE,
@@ -1532,7 +1541,7 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
         
         for section, key in changed_items:
             item_name = f"{section}.{key}"
-            if section in ['llm', 'retrieval', 'app', 'email', 'jwt']:
+            if section in ['llm', 'assessment', 'retrieval', 'app', 'email', 'jwt']:
                 reloaded_items.append(item_name)
             else:
                 not_reloaded_items.append(item_name)
@@ -1630,7 +1639,7 @@ async def rollback_config(version_id: int, user: dict = Depends(get_current_user
         
         for section, key in changed_items:
             item_name = f"{section}.{key}"
-            if section in ['llm', 'retrieval', 'app', 'email', 'jwt']:
+            if section in ['llm', 'assessment', 'retrieval', 'app', 'email', 'jwt']:
                 reloaded_items.append(item_name)
             else:
                 not_reloaded_items.append(item_name)
@@ -1740,6 +1749,213 @@ async def delete_faq(faq_id: int, user: dict = Depends(get_current_user)):
     except Exception as e:
         qa_system.logger.error(f"删除FAQ失败: {e}")
         raise HTTPException(status_code=500, detail=f"删除FAQ失败: {str(e)}")
+
+
+# ==================== 系统评估 ====================
+
+_ASSESSMENT_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'rag_qa', 'rag_accessment', 'uploads')
+os.makedirs(_ASSESSMENT_UPLOAD_DIR, exist_ok=True)
+
+
+@app.post("/assessment/upload")
+async def upload_assessment_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    """上传评估数据文件（JSON格式）"""
+    if not file.filename or not file.filename.lower().endswith('.json'):
+        raise HTTPException(status_code=400, detail="仅支持 .json 格式的评估数据文件")
+
+    file_id = str(uuid.uuid4())
+    save_path = os.path.join(_ASSESSMENT_UPLOAD_DIR, f"{file_id}_{file.filename}")
+    content = await file.read()
+    content_text = content.decode('utf-8')
+
+    with open(save_path, 'wb') as f:
+        f.write(content)
+
+    qa_system.mysql_client.save_assessment_file(
+        file_id=file_id,
+        file_name=file.filename,
+        file_path=save_path,
+        file_content=content_text,
+        uploaded_by=user.get('email')
+    )
+
+    file_record = qa_system.mysql_client.get_assessment_file_by_id(file_id)
+    return {
+        'file_id': file_record['file_id'],
+        'file_name': file_record['file_name'],
+        'uploaded_at': file_record['uploaded_at']
+    }
+
+
+@app.get("/assessment/files")
+async def list_assessment_files(user: dict = Depends(get_current_user)):
+    """获取已上传的评估文件列表"""
+    files = qa_system.mysql_client.get_assessment_files()
+    return [
+        {
+            'file_id': item['file_id'],
+            'file_name': item['file_name'],
+            'uploaded_at': item['uploaded_at'],
+            'uploaded_by': item.get('uploaded_by')
+        }
+        for item in files
+    ]
+
+
+@app.get("/assessment/files/{file_id}")
+async def get_assessment_file(file_id: str, user: dict = Depends(get_current_user)):
+    """查看已上传的评估文件内容"""
+    file_info = qa_system.mysql_client.get_assessment_file_by_id(file_id)
+    if not file_info:
+        raise HTTPException(status_code=404, detail="评估文件不存在")
+
+    parsed_content = None
+    try:
+        parsed_content = json.loads(file_info['file_content']) if file_info.get('file_content') else None
+    except Exception:
+        parsed_content = None
+
+    return {
+        'file_id': file_info['file_id'],
+        'file_name': file_info['file_name'],
+        'uploaded_at': file_info['uploaded_at'],
+        'uploaded_by': file_info.get('uploaded_by'),
+        'content': parsed_content,
+        'raw_content': file_info.get('file_content')
+    }
+
+
+@app.get("/assessment/results")
+async def list_assessment_results(limit: int = 50, user: dict = Depends(get_current_user)):
+    """获取评估结果历史列表"""
+    return qa_system.mysql_client.get_assessment_results(limit)
+
+
+@app.get("/assessment/results/{result_id}")
+async def get_assessment_result(result_id: str, user: dict = Depends(get_current_user)):
+    """获取评估结果详情"""
+    result = qa_system.mysql_client.get_assessment_result_by_id(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="评估结果不存在")
+    return result
+
+
+class AssessmentRunRequest(BaseModel):
+    file_id: str
+
+
+@app.post("/assessment/run")
+async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get_current_user)):
+    """执行 RAGAS 评估（SSE 流式返回进度和结果）"""
+    file_info = qa_system.mysql_client.get_assessment_file_by_id(request.file_id)
+    if not file_info:
+        raise HTTPException(status_code=404, detail="评估文件不存在，请先上传")
+
+    file_path = file_info['file_path']
+    result_id = str(uuid.uuid4())
+
+    def generate():
+        try:
+            import json as _json
+            from datasets import Dataset
+            from ragas import evaluate
+            from ragas.metrics import _faithfulness, _answer_relevancy, _context_precision, _context_recall
+            from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+            from base.config import Config
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = _json.load(f)
+
+            total = len(data)
+            qa_system.mysql_client.create_assessment_result(
+                result_id=result_id,
+                file_id=file_info['file_id'],
+                file_name=file_info['file_name'],
+                total_questions=total,
+                created_by=user.get('email')
+            )
+
+            yield f"data: {_json.dumps({'type': 'start', 'result_id': result_id, 'total_questions': total, 'completed_questions': 0}, ensure_ascii=False)}\n\n"
+
+            current_config = Config()
+            if not current_config.ASSESSMENT_API_KEY:
+                raise ValueError('assessment.api_key 未配置')
+
+            llm = ChatOpenAI(
+                model=current_config.ASSESSMENT_LLM_MODEL,
+                api_key=current_config.ASSESSMENT_API_KEY,
+                base_url=current_config.ASSESSMENT_BASE_URL,
+                temperature=0,
+            )
+            embeddings = OpenAIEmbeddings(
+                model=current_config.ASSESSMENT_EMBEDDING_MODEL,
+                api_key=current_config.ASSESSMENT_API_KEY,
+                base_url=current_config.ASSESSMENT_BASE_URL,
+            )
+
+            partial_results = []
+            for index, item in enumerate(data, start=1):
+                eval_data = {
+                    'question': [item['question']],
+                    'answer': [item['answer']],
+                    'contexts': [item['context']],
+                    'ground_truth': [item['ground_truth']],
+                }
+                dataset = Dataset.from_dict(eval_data)
+
+                result = evaluate(
+                    dataset=dataset,
+                    metrics=[_faithfulness, _answer_relevancy, _context_precision, _context_recall],
+                    llm=llm,
+                    embeddings=embeddings,
+                )
+
+                result_dict = {}
+                if hasattr(result, 'to_pandas'):
+                    try:
+                        result_df = result.to_pandas()
+                        if len(result_df.index) > 0:
+                            result_dict = result_df.iloc[0].to_dict()
+                    except Exception:
+                        result_dict = {}
+                elif isinstance(result, dict):
+                    result_dict = result
+
+                partial = {
+                    'faithfulness': float(result_dict.get('faithfulness')) if result_dict.get('faithfulness') is not None else None,
+                    'answer_relevancy': float(result_dict.get('answer_relevancy')) if result_dict.get('answer_relevancy') is not None else None,
+                    'context_precision': float(result_dict.get('context_precision')) if result_dict.get('context_precision') is not None else None,
+                    'context_recall': float(result_dict.get('context_recall')) if result_dict.get('context_recall') is not None else None,
+                }
+                partial_results.append(partial)
+                qa_system.mysql_client.update_assessment_result_progress(result_id, index)
+
+                yield f"data: {_json.dumps({'type': 'progress', 'result_id': result_id, 'completed_questions': index, 'total_questions': total, 'current_item': index, 'latest_result': partial}, ensure_ascii=False)}\n\n"
+
+            def average_metric(metric_name):
+                values = [item[metric_name] for item in partial_results if item.get(metric_name) is not None]
+                return round(sum(values) / len(values), 6) if values else None
+
+            results = {
+                'faithfulness': average_metric('faithfulness'),
+                'answer_relevancy': average_metric('answer_relevancy'),
+                'context_precision': average_metric('context_precision'),
+                'context_recall': average_metric('context_recall'),
+            }
+
+            result_content = _json.dumps({
+                'summary': results,
+                'items': partial_results,
+            }, ensure_ascii=False)
+            qa_system.mysql_client.complete_assessment_result(result_id, results, result_content)
+
+            yield f"data: {_json.dumps({'type': 'complete', 'result_id': result_id, 'completed_questions': total, 'total_questions': total, 'results': results}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            qa_system.mysql_client.fail_assessment_result(result_id, str(e))
+            yield f"data: {_json.dumps({'type': 'error', 'result_id': result_id, 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 if __name__ == '__main__':

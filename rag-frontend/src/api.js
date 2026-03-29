@@ -414,3 +414,90 @@ export const downloadCases = async (status) => {
 
   return true;
 };
+
+export const uploadAssessmentFile = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post('/assessment/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
+export const getAssessmentFiles = async () => {
+  const response = await api.get('/assessment/files');
+  return response.data;
+};
+
+export const getAssessmentFileDetail = async (fileId) => {
+  const response = await api.get(`/assessment/files/${fileId}`);
+  return response.data;
+};
+
+export const getAssessmentResults = async (limit = 50) => {
+  const response = await api.get('/assessment/results', { params: { limit } });
+  return response.data;
+};
+
+export const getAssessmentResultDetail = async (resultId) => {
+  const response = await api.get(`/assessment/results/${resultId}`);
+  return response.data;
+};
+
+export const runAssessment = async (fileId, onEvent) => {
+  const token = localStorage.getItem('token');
+  const controller = new AbortController();
+
+  const response = await fetch(`${API_BASE_URL}/assessment/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ file_id: fileId }),
+    signal: controller.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const pump = async () => {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop() || '';
+
+      for (const message of messages) {
+        const lines = message.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (onEvent) onEvent(data);
+            } catch (e) {
+              console.error('解析评估SSE数据失败:', e);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const promise = pump();
+
+  return {
+    promise,
+    cancel: () => controller.abort(),
+  };
+};

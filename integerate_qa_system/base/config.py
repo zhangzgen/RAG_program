@@ -8,6 +8,7 @@ config_file_abspath = os.path.join(config_dir_path, 'config.ini')
 
 HOT_RELOADABLE_SECTIONS = {
     'llm': ['model', 'api_key', 'base_url', 'enable_thinking', 'thinking_budget_tokens'],
+    'assessment': ['llm_model', 'embedding_model', 'api_key', 'base_url'],
     'retrieval': ['parent_chunk_size', 'child_chunk_size', 'chunk_overlap', 'retrieval_k', 'candidate_m'],
     'app': ['valid_sources', 'customer_service_phone'],
     'email': ['qq_email', 'qq_auth_code', 'smtp_server', 'smtp_port'],
@@ -78,6 +79,11 @@ class Config:
         
         self.DASHSCOPE_API_KEY = self.LLM_API_KEY
         self.DASHSCOPE_BASE_URL = self.LLM_BASE_URL
+
+        self.ASSESSMENT_LLM_MODEL = self.config.get('assessment', 'llm_model', fallback=self.LLM_MODEL)
+        self.ASSESSMENT_EMBEDDING_MODEL = self.config.get('assessment', 'embedding_model', fallback='text-embedding-v3')
+        self.ASSESSMENT_API_KEY = self.config.get('assessment', 'api_key', fallback=self.LLM_API_KEY) or self.LLM_API_KEY
+        self.ASSESSMENT_BASE_URL = self.config.get('assessment', 'base_url', fallback=self.LLM_BASE_URL) or self.LLM_BASE_URL
 
         self.PARENT_CHUNK_SIZE = self.config.getint('retrieval', 'parent_chunk_size', fallback=1200)
         self.CHILD_CHUNK_SIZE = self.config.getint('retrieval', 'child_chunk_size', fallback=300)

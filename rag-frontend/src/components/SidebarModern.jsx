@@ -15,7 +15,8 @@ const PROFESSIONAL_MENU_ITEMS = [
   { id: 'config', label: '配置信息' },
   { id: 'knowledge', label: '知识库' },
   { id: 'fqa', label: 'FQA管理' },
-  { id: 'case', label: 'Case分析' }
+  { id: 'case', label: 'Case分析' },
+  { id: 'assessment', label: '系统评估' }
 ];
 
 const getFileIcon = (fileType) => FILE_ICONS[fileType] || FILE_ICONS.default;

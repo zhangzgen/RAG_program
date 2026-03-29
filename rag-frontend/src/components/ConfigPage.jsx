@@ -102,6 +102,7 @@ const ConfigPage = () => {
       redis: 'Redis 配置',
       milvus: 'Milvus 配置',
       llm: 'LLM 配置',
+      assessment: '系统评估配置',
       retrieval: '检索参数配置',
       logger: '日志配置',
       app: '应用配置',
@@ -318,7 +319,7 @@ const ConfigPage = () => {
       title: 'LLM 配置',
       icon: '🤖',
       fields: [
-        { key: 'model', label: '模型名称', type: 'text', required: true, placeholder: 'qwen-plus', hint: '支持: qwen-plus, deepseek-chat, deepseek-reasoner等' },
+        { key: 'model', label: '聊天模型', type: 'text', required: true, placeholder: 'qwen-plus', hint: '问答聊天使用的模型' },
         { key: 'api_key', label: 'API Key', type: 'password', required: true, hint: '各平台API密钥' },
         { key: 'base_url', label: 'API 地址', type: 'text', required: true, placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hint: 'OpenAI兼容的API地址' },
         { key: 'enable_thinking', label: '启用思考模式', type: 'select', required: false, options: [
@@ -326,6 +327,17 @@ const ConfigPage = () => {
           { value: 'false', label: '禁用' }
         ], hint: '思考模型会输出推理过程' },
         { key: 'thinking_budget_tokens', label: '思考预算Token', type: 'number', required: false, placeholder: '10000', hint: '思考过程的最大token数' }
+      ]
+    },
+    {
+      section: 'assessment',
+      title: '系统评估配置',
+      icon: '📏',
+      fields: [
+        { key: 'llm_model', label: '评估模型', type: 'text', required: true, placeholder: 'qwen-max', hint: 'RAGAS评估使用的LLM模型' },
+        { key: 'embedding_model', label: 'Embedding模型', type: 'text', required: true, placeholder: 'text-embedding-v3', hint: 'RAGAS评估使用的向量模型' },
+        { key: 'api_key', label: 'API Key', type: 'password', required: true, hint: '评估调用使用的API密钥' },
+        { key: 'base_url', label: 'API 地址', type: 'text', required: true, placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hint: 'OpenAI兼容的API地址' }
       ]
     },
     {
@@ -422,6 +434,7 @@ const ConfigPage = () => {
               {renderConfigSection('Redis 配置', config.redis, '⚡')}
               {renderConfigSection('Milvus 配置', config.milvus, '🔍')}
               {renderConfigSection('LLM 配置', config.llm, '🤖')}
+              {config.assessment && renderConfigSection('系统评估配置', config.assessment, '📏')}
               {renderConfigSection('检索参数', config.retrieval, '📊')}
               {renderConfigSection('日志配置', config.logger, '📝')}
               {renderConfigSection('应用配置', config.app, '⚙️')}
