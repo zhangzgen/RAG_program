@@ -39,13 +39,13 @@ eval_data = {
 dataset = Dataset.from_dict(eval_data)
 
 # 3. 配置RAGAS评估环境
-# # 初始化ChatOpenAI模型，指定使用gpt-4模型，并设置OpenAI API密钥
-# llm = ChatOpenAI(model="gpt-4", openai_api_key="your_openai_api_key")
-# # 初始化OpenAI嵌入模型，用于计算语义相似度，设置API密钥
-# embeddings = OpenAIEmbeddings(openai_api_key="your_openai_api_key")
-llm = ChatOllama(model='qwen2.5:7b', base_url='http://localhost:11434')
-embeddings = OllamaEmbeddings(model='mxbai-embed-large:latest', base_url='http://localhost:11434')
-
+# 初始化ChatOpenAI模型，指定使用gpt-4模型，并设置OpenAI API密钥
+llm = ChatOpenAI(model="gpt-5.4", openai_api_key="sk-9WnLWCaiz7gk4rN54uvPTHPkb52wA4W8EXpiRK724VQ0qY8h",base_url='https://api.chatanywhere.tech')
+# 初始化OpenAI嵌入模型，用于计算语义相似度，设置API密钥
+embeddings = OpenAIEmbeddings(model="gpt-5.4", openai_api_key="sk-9WnLWCaiz7gk4rN54uvPTHPkb52wA4W8EXpiRK724VQ0qY8h",base_url='https://api.chatanywhere.tech')
+# llm = ChatOllama(model='qwen2.5:7b', base_url='http://localhost:11434')
+# embeddings = OllamaEmbeddings(model='mxbai-embed-large:latest', base_url='http://localhost:11434')
+print(llm.client('你好'))
 # 4. 执行评估
 # 调用evaluate函数，传入数据集、评估指标、LLM模型和嵌入模型
 result = evaluate(
@@ -63,6 +63,7 @@ result = evaluate(
     # 传入配置好的嵌入模型
     embeddings=embeddings
 )
+
 
 # 5. 输出并保存结果
 # 打印评估结果标题

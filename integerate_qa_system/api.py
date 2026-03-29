@@ -281,21 +281,29 @@ async def handle_query(request: Request, user: dict = Depends(get_current_user))
                 source_filter=source_filter,
                 session_id=session_id
             ):
-                if len(item) == 3:
-                    token, is_complete, conversation_id = item
-                else:
-                    token, is_complete = item
+                # 新格式: (token_type, token, is_complete[, conversation_id])
+                if len(item) == 4:
+                    token_type, token, is_complete, conversation_id = item
+                elif len(item) == 3:
+                    token_type, token, is_complete = item
                     conversation_id = None
-                
+                else:
+                    # 兼容旧格式
+                    token_type, token = 'answer', item[0]
+                    is_complete = item[1] if len(item) > 1 else False
+                    conversation_id = None
+
+                # 'complete' 只是 pipeline 结束信号，token 为空，前端用 is_complete 判断
                 message = {
+                    "token_type": token_type,
                     "token": token,
                     "is_complete": is_complete,
                     "session_id": session_id
                 }
-                
+
                 if is_complete and conversation_id:
                     message["conversation_id"] = conversation_id
-                
+
                 yield f"data: {json.dumps(message, ensure_ascii=False)}\n\n"
 
         except Exception as e:

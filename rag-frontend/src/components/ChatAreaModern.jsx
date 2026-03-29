@@ -16,9 +16,16 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
   const [sessionCreated, setSessionCreated] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [messageStatus, setMessageStatus] = useState({});
+  const [expandedThinking, setExpandedThinking] = useState({});
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  
+  const prevMsgCountRef = useRef(0);
+  // streaming buffer refs — avoid setState on every token
+  const streamingIdRef = useRef(null);   // message id being streamed
+  const thinkingBufRef = useRef('');
+  const contentBufRef = useRef('');
+  const rafIdRef = useRef(null);
+  // legacy compat
   const streamingContentRef = useRef('');
   const streamingMessageIndexRef = useRef(-1);
 
@@ -49,6 +56,10 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       setMessages([]);
       setHasStarted(false);
       setSessionCreated(false);
+      streamingIdRef.current = null;
+      thinkingBufRef.current = '';
+      contentBufRef.current = '';
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       streamingContentRef.current = '';
       streamingMessageIndexRef.current = -1;
     }
@@ -102,32 +113,34 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
   }, [sessionData]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // 优化的流式数据处理函数
-  const processStreamData = useCallback((data, messageIndex) => {
-    if (data.token) {
-      // 使用函数式更新确保数据一致性
-      setMessages(prev => {
-        const newMessages = [...prev];
-        if (newMessages[messageIndex]) {
-          // 数据去重：检查是否已经包含该token
-          const currentContent = newMessages[messageIndex].content;
-          if (!currentContent.endsWith(data.token)) {
-            newMessages[messageIndex] = {
-              ...newMessages[messageIndex],
-              content: currentContent + data.token
-            };
-          }
-        }
-        return newMessages;
+    const newCount = messages.length;
+    if (newCount > prevMsgCountRef.current) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       });
     }
+    prevMsgCountRef.current = newCount;
+  }, [messages.length]);
+
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+  };
+
+  // flush buffered tokens to state ~every 50ms via rAF
+  const scheduleFlush = useCallback((msgId) => {
+    if (rafIdRef.current) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const thinking = thinkingBufRef.current;
+      const content = contentBufRef.current;
+      setMessages(prev => prev.map(m =>
+        m.id === msgId ? { ...m, thinking, content } : m
+      ));
+      // auto-scroll while streaming
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
   }, []);
 
   const handleSubmit = async (e) => {
@@ -138,12 +151,9 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     setInput('');
     setHasStarted(true);
     
-    const userMsgIndex = messages.length;
     const userMsgId = generateMessageId();
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: userMessage }]);
     setIsLoading(true);
-    
-    let isNewSession = false;
 
     try {
       let currentSessionId = sessionId;
@@ -152,19 +162,24 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
         currentSessionId = sessionResponse.session_id;
         setSessionId(currentSessionId);
         setSessionCreated(true);
-        isNewSession = true;
       }
 
-      const assistantMsgIndex = userMsgIndex + 1;
       const assistantMsgId = generateMessageId();
-      setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
-      streamingMessageIndexRef.current = assistantMsgIndex;
-      streamingContentRef.current = '';
+      setMessages(prev => [...prev, {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        thinking: '',
+        showThinking: true,
+      }]);
+      streamingIdRef.current = assistantMsgId;
+      thinkingBufRef.current = '';
+      contentBufRef.current = '';
 
       const stream = await queryAPI(userMessage, null, currentSessionId);
       const reader = stream.getReader();
       const decoder = new TextDecoder();
-      
+
       let buffer = '';
       let streamComplete = false;
 
@@ -173,80 +188,91 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.error) {
-                throw new Error(data.error);
-              }
-              if (data.token) {
-                processStreamData(data, assistantMsgIndex);
-              }
-              if (data.is_complete) {
-                setIsLoading(false);
-                if (data.conversation_id) {
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    if (newMessages[assistantMsgIndex]) {
-                      newMessages[assistantMsgIndex] = {
-                        ...newMessages[assistantMsgIndex],
-                        conversationId: data.conversation_id
-                      };
-                    }
-                    return newMessages;
-                  });
-                }
-              }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
-              setMessages(prev => {
-                const newMessages = [...prev];
-                if (newMessages[assistantMsgIndex]) {
-                  newMessages[assistantMsgIndex] = {
-                    ...newMessages[assistantMsgIndex],
-                    content: newMessages[assistantMsgIndex].content + `\n[数据解析错误: ${e.message}]`
-                  };
-                }
-                return newMessages;
-              });
-              setIsLoading(false);
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) {
+              throw new Error(data.error);
             }
+
+            if (data.token) {
+              if (data.token_type === 'thinking') {
+                thinkingBufRef.current += data.token;
+              } else if (data.token_type === 'answer') {
+                contentBufRef.current += data.token;
+              }
+              scheduleFlush(assistantMsgId);
+            }
+
+            if (data.is_complete) {
+              streamComplete = true;
+              setIsLoading(false);
+              if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+              }
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                  ? {
+                      ...m,
+                      thinking: thinkingBufRef.current,
+                      content: contentBufRef.current,
+                      showThinking: false,
+                      conversationId: data.conversation_id || m.conversationId,
+                    }
+                  : m
+              ));
+            }
+          } catch (e) {
+            console.error('Error parsing SSE data:', e);
+            setMessages(prev => prev.map(m =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    content: `${contentBufRef.current}\n[数据解析错误: ${e.message}]`,
+                    showThinking: false,
+                  }
+                : m
+            ));
+            setIsLoading(false);
           }
         }
       }
-      
+
       if (buffer.trim().startsWith('data: ')) {
         try {
           const data = JSON.parse(buffer.trim().slice(6));
           if (data.token) {
-            processStreamData(data, assistantMsgIndex);
+            if (data.token_type === 'thinking') {
+              thinkingBufRef.current += data.token;
+            } else if (data.token_type === 'answer') {
+              contentBufRef.current += data.token;
+            }
           }
           if (data.is_complete) {
-            setIsLoading(false);
             streamComplete = true;
-            if (data.conversation_id) {
-              setMessages(prev => {
-                const newMessages = [...prev];
-                if (newMessages[assistantMsgIndex]) {
-                  newMessages[assistantMsgIndex] = {
-                    ...newMessages[assistantMsgIndex],
-                    conversationId: data.conversation_id
-                  };
-                }
-                return newMessages;
-              });
-            }
+            setIsLoading(false);
+            setMessages(prev => prev.map(m =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    thinking: thinkingBufRef.current,
+                    content: contentBufRef.current,
+                    showThinking: false,
+                    conversationId: data.conversation_id || m.conversationId,
+                  }
+                : m
+            ));
           }
         } catch (e) {
           console.error('Error parsing remaining buffer:', e);
         }
       }
-      
+
       if (streamComplete && onSessionCreated) {
         onSessionCreated(currentSessionId);
       }
@@ -321,17 +347,39 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                   </div>
                 ) : (
                   <>
+                    {message.role === 'assistant' && message.thinking && (
+                      <div className="thinking-panel-modern">
+                        <button
+                          type="button"
+                          className={`thinking-toggle-modern ${(expandedThinking[message.id] ?? !!message.showThinking) ? 'expanded' : ''}`}
+                          onClick={() => setExpandedThinking(prev => ({
+                            ...prev,
+                            [message.id]: !(prev[message.id] ?? !!message.showThinking),
+                          }))}
+                        >
+                          <span className="thinking-badge-modern">思考过程</span>
+                          <span className="thinking-arrow-modern">{(expandedThinking[message.id] ?? !!message.showThinking) ? '▼' : '▶'}</span>
+                        </button>
+                        {(expandedThinking[message.id] ?? !!message.showThinking) && (
+                          <div className="thinking-content-modern">
+                            <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.thinking}</span>
+                            {isLoading && isLastMessage && !message.content && <span className="streaming-cursor"></span>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="message-text-wrapper">
                       {message.role === 'assistant' ? (
-                        <div className={`message-text-modern markdown-content ${isStreamingContent ? 'streaming' : ''}`}>
-                          <ReactMarkdown 
-                            key={`${messageKey}_md`}
+                        <div className="message-text-modern markdown-content">
+                          <ReactMarkdown
+                            key={message.id}
                             remarkPlugins={[remarkGfm]}
                             skipHtml={true}
                           >
                             {message.content || ''}
                           </ReactMarkdown>
-                          {isStreamingContent && <span className="streaming-cursor"></span>}
+                          {(isStreaming || isStreamingContent) && <span className="streaming-cursor"></span>}
                         </div>
                       ) : (
                         <div className="message-text-modern">
@@ -339,7 +387,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                         </div>
                       )}
                       {!isStreamingContent && message.content && (
-                        <button 
+                        <button
                           className="copy-btn-modern"
                           onClick={() => copyToClipboard(message.content, messageKey)}
                           title="复制消息"
@@ -360,7 +408,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                     {!isStreamingContent && message.content && message.role === 'assistant' && message.conversationId && (
                       <div className="message-footer-modern">
                         <div className="feedback-buttons-modern">
-                          <button 
+                          <button
                             className={`feedback-btn-modern like-btn ${messageStatus[message.conversationId] === 1 ? 'active' : ''}`}
                             onClick={() => handleStatusUpdate(message.conversationId, messageStatus[message.conversationId] === 1 ? 0 : 1)}
                             title="赞"
@@ -370,7 +418,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                             </svg>
                             <span>赞</span>
                           </button>
-                          <button 
+                          <button
                             className={`feedback-btn-modern dislike-btn ${messageStatus[message.conversationId] === 2 ? 'active' : ''}`}
                             onClick={() => handleStatusUpdate(message.conversationId, messageStatus[message.conversationId] === 2 ? 0 : 2)}
                             title="踩"

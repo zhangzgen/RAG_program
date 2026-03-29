@@ -76,21 +76,23 @@ class IntegratedQASystem:
             raise
 
     def call_dashscope(self, prompt):
-        """调用LLM API生成答案（流式输出），支持思考模型"""
+        """调用LLM API生成答案（流式输出），yield (token_type, token) 元组
+        token_type: 'thinking' 思考过程 | 'answer' 正式回答
+        """
         try:
             from base.config import Config
             current_config = Config()
-            
+
             api_key = current_config.LLM_API_KEY or current_config.DASHSCOPE_API_KEY
             base_url = current_config.LLM_BASE_URL or current_config.DASHSCOPE_BASE_URL
             model = current_config.LLM_MODEL
-            
+
             self.logger.info(f"LLM调用配置: model={model}, base_url={base_url}")
-            
+
             client = OpenAI(api_key=api_key, base_url=base_url)
-            
+
             is_thinking = current_config.is_thinking_model()
-            
+
             request_params = {
                 "model": model,
                 "messages": [
@@ -100,7 +102,7 @@ class IntegratedQASystem:
                 "timeout": 60,
                 "stream": True
             }
-            
+
             if is_thinking:
                 request_params["extra_body"] = {
                     "thinking": {
@@ -109,17 +111,24 @@ class IntegratedQASystem:
                     }
                 }
                 self.logger.info(f"使用思考模型: {model}")
-            
+
             completion = client.chat.completions.create(**request_params)
-            
+
             for chunk in completion:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    yield content
-                    
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                # 思考 token（qwen3 / deepseek-r1 等）
+                reasoning = getattr(delta, 'reasoning_content', None)
+                if reasoning:
+                    yield 'thinking', reasoning
+                # 正式回答 token
+                if delta.content:
+                    yield 'answer', delta.content
+
         except Exception as e:
             self.logger.error(f"LLM调用失败: {e}")
-            yield f"错误：LLM调用失败 - {e}"
+            yield 'answer', f"错误：LLM调用失败 - {e}"
 
     def _fetch_recent_history(self, session_id: str) -> list:
         """获取最近5轮对话历史"""
@@ -241,7 +250,7 @@ class IntegratedQASystem:
                 if session_id:
                     result = self.update_session_history(session_id, query, answer, trace.to_json())
                     conversation_id = result.get('conversation_id')
-                yield answer, True, conversation_id
+                yield 'answer', answer, True, conversation_id
                 return
             else:
                 trace.fqa.matched = False
@@ -289,21 +298,22 @@ class IntegratedQASystem:
                 prompt = self.rag_system.rag_prompt.format(
                     context="", history=history_text, question=query, phone=self.config.CUSTOMER_SERVICE_PHONE
                 )
-                for token in self.rag_system.llm(prompt):
-                    collected_answer += token
-                    yield token, False
+                for token_type, token in self.rag_system.llm(prompt):
+                    if token_type == 'answer':
+                        collected_answer += token
+                    yield token_type, token, False
                 trace.llm.finish(output=collected_answer, status='success')
             except Exception as e:
                 trace.llm.fail(str(e))
                 collected_answer = f"抱歉，处理问题时出错。请联系人工客服：{self.config.CUSTOMER_SERVICE_PHONE}"
-                yield collected_answer, True
-            
+                yield 'answer', collected_answer, True
+
             trace.finish(answer=collected_answer, source='llm_direct')
             conversation_id = None
             if session_id:
                 result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
                 conversation_id = result.get('conversation_id')
-            yield "", True, conversation_id
+            yield 'complete', '', True, conversation_id
             return
         
         # ===== Step 3: 检索策略选择 =====
@@ -382,24 +392,25 @@ class IntegratedQASystem:
         
         collected_answer = ""
         try:
-            for token in self.rag_system.llm(prompt):
-                collected_answer += token
-                yield token, False
+            for token_type, token in self.rag_system.llm(prompt):
+                if token_type == 'answer':
+                    collected_answer += token
+                yield token_type, token, False
             trace.llm.finish(output=collected_answer, status='success')
         except Exception as e:
             trace.llm.fail(str(e))
             collected_answer = f"抱歉，处理问题时出错。请联系人工客服：{self.config.CUSTOMER_SERVICE_PHONE}"
-            yield collected_answer, True
-        
+            yield 'answer', collected_answer, True
+
         # 完成trace
         trace.finish(answer=collected_answer, source='rag')
-        
+
         conversation_id = None
         if session_id:
             result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
             conversation_id = result.get('conversation_id')
-        
-        yield "", True, conversation_id
+
+        yield 'complete', '', True, conversation_id
 
 
 def main():
