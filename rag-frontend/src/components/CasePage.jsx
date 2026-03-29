@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getCases, getCaseDetail, getVectorDetail, downloadCases } from '../api';
+import { getCases, getCaseDetail, getVectorDetail, downloadCases, previewFileByPath } from '../api';
+import FilePreview from './FilePreview';
 import './CasePage.css';
 
 const CasePage = () => {
@@ -14,6 +15,8 @@ const CasePage = () => {
   const [expandedSections, setExpandedSections] = useState({});
   const [expandedResult, setExpandedResult] = useState(null);
   const [vectorDetails, setVectorDetails] = useState({});
+  const [previewFile, setPreviewFile] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const loadCases = useCallback(async () => {
     try {
@@ -52,6 +55,25 @@ const CasePage = () => {
       console.error('下载Case数据失败:', error);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleTraceSource = async (filePath) => {
+    if (!filePath) return;
+    try {
+      const data = await previewFileByPath(filePath);
+      setPreviewFile({
+        file_name: data.file_name || filePath.split('/').pop().split('\\').pop(),
+        content: data.content,
+        file_type: data.file_type,
+        file_ext: data.file_ext,
+        mime_type: data.mime_type,
+        file_size: data.file_size,
+        path: filePath
+      });
+      setShowPreview(true);
+    } catch (error) {
+      console.error('溯源文件预览失败:', error);
     }
   };
 
@@ -172,12 +194,11 @@ const CasePage = () => {
                   <span className="retrieval-expand-hint">{expandedResult === `trace-result-${index}` ? '▼ 收起' : '▶ 展开'}</span>
                 </div>
                 <div className="retrieval-result-content">
-                  {expandedResult === `trace-result-${index}` 
+                  {expandedResult === `trace-result-${index}`
                     ? fullContent
-                    : result.content && result.content.length > 100 
-                      ? result.content.substring(0, 100) + '...' 
-                      : result.content || ''
-                  }
+                    : fullContent && fullContent.length > 120
+                      ? fullContent.substring(0, 120) + '...'
+                      : fullContent || ''}
                 </div>
                 {expandedResult === `trace-result-${index}` && (
                   <>
@@ -189,8 +210,17 @@ const CasePage = () => {
                     )}
                     {(vectorDetail?.file_path || result.file_path) && (
                       <div className="retrieval-result-trace">
+                        <button
+                          className="trace-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTraceSource(vectorDetail?.file_path || result.file_path);
+                          }}
+                        >
+                          📂 查看源文件
+                        </button>
                         <span className="retrieval-file-path" title={vectorDetail?.file_path || result.file_path}>
-                          📂 {(vectorDetail?.file_path || result.file_path).split('/').pop().split('\\').pop()}
+                          {(vectorDetail?.file_path || result.file_path).split('/').pop().split('\\').pop()}
                         </span>
                       </div>
                     )}
@@ -250,6 +280,7 @@ const CasePage = () => {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <>
     <div className="case-page">
       <div className="case-header">
         <h2>Case分析</h2>
@@ -370,6 +401,14 @@ const CasePage = () => {
         )}
       </div>
     </div>
+
+      {showPreview && previewFile && (
+        <FilePreview
+          file={previewFile}
+          onClose={() => { setShowPreview(false); setPreviewFile(null); }}
+        />
+      )}
+    </>
   );
 };
 

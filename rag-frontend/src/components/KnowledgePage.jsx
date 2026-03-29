@@ -268,11 +268,11 @@ const KnowledgePage = () => {
     }
   };
 
-  const handleResultClick = (result) => {
-    if (expandedResult === result.id) {
+  const handleResultClick = (index) => {
+    if (expandedResult === index) {
       setExpandedResult(null);
     } else {
-      setExpandedResult(result.id);
+      setExpandedResult(index);
     }
   };
 
@@ -490,9 +490,9 @@ const KnowledgePage = () => {
               <div className="results-list">
                 {vectorResults.map((result, index) => (
                   <div 
-                    key={result.id} 
-                    className={`vector-result-item ${expandedResult === result.id ? 'expanded' : ''}`}
-                    onClick={() => handleResultClick(result)}
+                    key={index} 
+                    className={`vector-result-item ${expandedResult === index ? 'expanded' : ''}`}
+                    onClick={() => handleResultClick(index)}
                   >
                     <div className="result-header">
                       <span className="result-index">#{index + 1}</span>
@@ -500,17 +500,16 @@ const KnowledgePage = () => {
                       {result.score !== null && result.score !== undefined && (
                         <span className="result-score">置信度: {typeof result.score === 'number' ? result.score.toFixed(4) : result.score}</span>
                       )}
-                      <span className="result-expand-hint">{expandedResult === result.id ? '▼ 收起' : '▶ 展开'}</span>
+                      <span className="result-expand-hint">{expandedResult === index ? '▼ 收起' : '▶ 展开'}</span>
                     </div>
                     <div className="result-content">
-                      {expandedResult === result.id 
-                        ? result.content 
-                        : result.content.length > 100 
-                          ? result.content.substring(0, 100) + '...' 
-                          : result.content
-                      }
+                      {expandedResult === index
+                        ? result.content
+                        : result.content && result.content.length > 120
+                          ? result.content.substring(0, 120) + '...'
+                          : result.content}
                     </div>
-                    {expandedResult === result.id && (
+                    {expandedResult === index && (
                       <>
                         {result.parent_content && (
                           <div className="result-parent">
