@@ -285,6 +285,7 @@ class IntegratedQASystem:
             trace.llm.is_thinking_model = self.config.is_thinking_model()
             
             collected_answer = ""
+            collected_thinking = ""
             try:
                 # 格式化对话历史
                 history_text = ""
@@ -294,14 +295,17 @@ class IntegratedQASystem:
                         history_text += f"用户: {entry.get('query', '')}\n助手: {entry.get('answer', '')}\n"
                         if i < len(history) - 1:
                             history_text += "\n"
-                
+
                 prompt = self.rag_system.rag_prompt.format(
                     context="", history=history_text, question=query, phone=self.config.CUSTOMER_SERVICE_PHONE
                 )
                 for token_type, token in self.rag_system.llm(prompt):
                     if token_type == 'answer':
                         collected_answer += token
+                    elif token_type == 'thinking':
+                        collected_thinking += token
                     yield token_type, token, False
+                trace.llm.thinking_content = collected_thinking if collected_thinking else None
                 trace.llm.finish(output=collected_answer, status='success')
             except Exception as e:
                 trace.llm.fail(str(e))
@@ -391,11 +395,15 @@ class IntegratedQASystem:
         trace.llm.input = prompt[:500] + '...' if len(prompt) > 500 else prompt
         
         collected_answer = ""
+        collected_thinking = ""
         try:
             for token_type, token in self.rag_system.llm(prompt):
                 if token_type == 'answer':
                     collected_answer += token
+                elif token_type == 'thinking':
+                    collected_thinking += token
                 yield token_type, token, False
+            trace.llm.thinking_content = collected_thinking if collected_thinking else None
             trace.llm.finish(output=collected_answer, status='success')
         except Exception as e:
             trace.llm.fail(str(e))

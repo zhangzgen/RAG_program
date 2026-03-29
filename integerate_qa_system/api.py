@@ -1867,7 +1867,7 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
             import json as _json
             from datasets import Dataset
             from ragas import evaluate
-            from ragas.metrics import _faithfulness, _answer_relevancy, _context_precision, _context_recall
+            from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
             from langchain_openai import ChatOpenAI, OpenAIEmbeddings
             from base.config import Config
 
@@ -1886,20 +1886,34 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
             yield f"data: {_json.dumps({'type': 'start', 'result_id': result_id, 'total_questions': total, 'completed_questions': 0}, ensure_ascii=False)}\n\n"
 
             current_config = Config()
-            if not current_config.ASSESSMENT_API_KEY:
-                raise ValueError('assessment.api_key 未配置')
 
-            llm = ChatOpenAI(
-                model=current_config.ASSESSMENT_LLM_MODEL,
-                api_key=current_config.ASSESSMENT_API_KEY,
-                base_url=current_config.ASSESSMENT_BASE_URL,
-                temperature=0,
-            )
-            embeddings = OpenAIEmbeddings(
-                model=current_config.ASSESSMENT_EMBEDDING_MODEL,
-                api_key=current_config.ASSESSMENT_API_KEY,
-                base_url=current_config.ASSESSMENT_BASE_URL,
-            )
+            from ragas.llms import LangchainLLMWrapper
+            from ragas.embeddings import LangchainEmbeddingsWrapper
+
+            if current_config.ASSESSMENT_EMBEDDING_PROVIDER == 'ollama':
+                from langchain_ollama import ChatOllama, OllamaEmbeddings
+                llm = LangchainLLMWrapper(ChatOllama(
+                    model=current_config.ASSESSMENT_LLM_MODEL,
+                    base_url=current_config.ASSESSMENT_BASE_URL,
+                ))
+                embeddings = LangchainEmbeddingsWrapper(OllamaEmbeddings(
+                    model=current_config.ASSESSMENT_EMBEDDING_MODEL,
+                    base_url=current_config.ASSESSMENT_EMBEDDING_BASE_URL,
+                ))
+            else:
+                if not current_config.ASSESSMENT_API_KEY:
+                    raise ValueError('assessment.api_key 未配置')
+                llm = LangchainLLMWrapper(ChatOpenAI(
+                    model=current_config.ASSESSMENT_LLM_MODEL,
+                    api_key=current_config.ASSESSMENT_API_KEY,
+                    base_url=current_config.ASSESSMENT_BASE_URL,
+                    temperature=0,
+                ))
+                embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings(
+                    model=current_config.ASSESSMENT_EMBEDDING_MODEL,
+                    api_key=current_config.ASSESSMENT_API_KEY,
+                    base_url=current_config.ASSESSMENT_BASE_URL,
+                ))
 
             partial_results = []
             for index, item in enumerate(data, start=1):
@@ -1913,7 +1927,7 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
 
                 result = evaluate(
                     dataset=dataset,
-                    metrics=[_faithfulness, _answer_relevancy, _context_precision, _context_recall],
+                    metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
                     llm=llm,
                     embeddings=embeddings,
                 )
@@ -1929,11 +1943,21 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
                 elif isinstance(result, dict):
                     result_dict = result
 
+                import math as _math
+                def _safe_float(v):
+                    if v is None:
+                        return None
+                    try:
+                        f = float(v)
+                        return None if _math.isnan(f) or _math.isinf(f) else f
+                    except (TypeError, ValueError):
+                        return None
+
                 partial = {
-                    'faithfulness': float(result_dict.get('faithfulness')) if result_dict.get('faithfulness') is not None else None,
-                    'answer_relevancy': float(result_dict.get('answer_relevancy')) if result_dict.get('answer_relevancy') is not None else None,
-                    'context_precision': float(result_dict.get('context_precision')) if result_dict.get('context_precision') is not None else None,
-                    'context_recall': float(result_dict.get('context_recall')) if result_dict.get('context_recall') is not None else None,
+                    'faithfulness': _safe_float(result_dict.get('faithfulness')),
+                    'answer_relevancy': _safe_float(result_dict.get('answer_relevancy')),
+                    'context_precision': _safe_float(result_dict.get('context_precision')),
+                    'context_recall': _safe_float(result_dict.get('context_recall')),
                 }
                 partial_results.append(partial)
                 qa_system.mysql_client.update_assessment_result_progress(result_id, index)

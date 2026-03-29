@@ -4,10 +4,10 @@ import pandas as pd
 from ragas import evaluate
 # 导入ragas的评估指标，包括忠实度、答案相关性、上下文相关性和上下文召回率
 from ragas.metrics import (
-    _faithfulness,
-    _answer_relevancy,
-    _context_precision,
-    _context_recall
+    faithfulness,
+    answer_relevancy,
+    context_precision,
+    context_recall
 )
 # 导入datasets库的Dataset类，用于构建RAGAS所需的数据格式
 from datasets import Dataset
@@ -40,12 +40,12 @@ dataset = Dataset.from_dict(eval_data)
 
 # 3. 配置RAGAS评估环境
 # 初始化ChatOpenAI模型，指定使用gpt-4模型，并设置OpenAI API密钥
-llm = ChatOpenAI(model="gpt-5.4", openai_api_key="sk-9WnLWCaiz7gk4rN54uvPTHPkb52wA4W8EXpiRK724VQ0qY8h",base_url='https://api.chatanywhere.tech')
+# llm = ChatOpenAI(model="deepseek-chat", openai_api_key="sk-918f223151334727ba1253378dc90a23",base_url='https://api.deepseek.com',model_kwargs={"n": 3})
 # 初始化OpenAI嵌入模型，用于计算语义相似度，设置API密钥
-embeddings = OpenAIEmbeddings(model="gpt-5.4", openai_api_key="sk-9WnLWCaiz7gk4rN54uvPTHPkb52wA4W8EXpiRK724VQ0qY8h",base_url='https://api.chatanywhere.tech')
-# llm = ChatOllama(model='qwen2.5:7b', base_url='http://localhost:11434')
-# embeddings = OllamaEmbeddings(model='mxbai-embed-large:latest', base_url='http://localhost:11434')
-print(llm.client('你好'))
+# embeddings = OpenAIEmbeddings(model="deepseek-embedding", openai_api_key="sk-918f223151334727ba1253378dc90a23",base_url='https://api.deepseek.com')
+llm = ChatOllama(model='qwen2.5:7b', base_url='http://localhost:11434')
+embeddings = OllamaEmbeddings(model='mxbai-embed-large:latest', base_url='http://localhost:11434')
+# print(llm.client('你好'))
 # 4. 执行评估
 # 调用evaluate函数，传入数据集、评估指标、LLM模型和嵌入模型
 result = evaluate(
@@ -53,10 +53,10 @@ result = evaluate(
     dataset=dataset,
     # 指定使用的评估指标列表
     metrics=[
-        _faithfulness,  # 忠实度：答案是否基于上下文
-        _answer_relevancy,  # 答案相关性：答案与问题的匹配度
-        _context_precision,  # 上下文相关性：上下文是否仅包含相关信息
-        _context_recall  # 上下文召回率：上下文是否包含所有必要信息
+        faithfulness,  # 忠实度：答案是否基于上下文
+        answer_relevancy,  # 答案相关性：答案与问题的匹配度
+        context_precision,  # 上下文相关性：上下文是否仅包含相关信息
+        context_recall  # 上下文召回率：上下文是否包含所有必要信息
     ],
     # 传入配置好的LLM模型
     llm=llm,

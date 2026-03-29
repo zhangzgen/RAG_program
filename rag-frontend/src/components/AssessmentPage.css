@@ -37,6 +37,9 @@
 .assessment-side-column {
   width: 320px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .assessment-card {
@@ -53,15 +56,15 @@
 
 .sticky-card,
 .sticky-card-secondary {
-  position: sticky;
+  position: relative;
 }
 
 .sticky-card {
-  top: 72px;
+  top: 0;
 }
 
 .sticky-card-secondary {
-  top: 360px;
+  top: 0;
 }
 
 .assessment-section-header {
@@ -97,6 +100,31 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.assessment-file-list::-webkit-scrollbar,
+.assessment-history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.assessment-file-list::-webkit-scrollbar-track,
+.assessment-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.assessment-file-list::-webkit-scrollbar-thumb,
+.assessment-history-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.assessment-file-list::-webkit-scrollbar-thumb:hover,
+.assessment-history-list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .assessment-file-item {
