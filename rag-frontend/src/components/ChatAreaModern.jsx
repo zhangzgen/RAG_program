@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import reactSvgUrl from '../assets/react.svg';
+import { arrowDownIcon, arrowRightIcon, thinkingIcon } from '../assets/icons';
 import { queryAPI, createSession, updateConversationStatus } from '../api';
 import './ChatAreaModern.css';
 
@@ -452,9 +452,13 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                             [message.id]: !(prev[message.id] ?? !!message.showThinking),
                           }))}
                         >
-                          <img src={reactSvgUrl} className="thinking-icon-modern" alt="" />
+                          <img src={thinkingIcon} className="thinking-icon-modern" alt="" />
                           <span className="thinking-badge-modern">思考过程</span>
-                          <span className="thinking-arrow-modern">{(expandedThinking[message.id] ?? !!message.showThinking) ? '▼' : '▶'}</span>
+                          <img
+                            src={(expandedThinking[message.id] ?? !!message.showThinking) ? arrowDownIcon : arrowRightIcon}
+                            className="thinking-arrow-modern"
+                            alt=""
+                          />
                         </button>
                         {(expandedThinking[message.id] ?? !!message.showThinking) && (
                           <div className="thinking-content-modern">

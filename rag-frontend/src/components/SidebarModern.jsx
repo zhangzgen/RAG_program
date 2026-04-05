@@ -1,7 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { getSessions, deleteSession, getSessionConversations, getCategories, getCategoryFiles } from '../api';
 import './SidebarModern.css';
-import sideBarIcon from '/side_bar.svg';
+import { sidebarIcon } from '../assets/icons';
 
 const FILE_ICONS = {
   '.pdf': '📄', '.doc': '📝', '.docx': '📝', '.xls': '📊', '.xlsx': '📊',
@@ -187,7 +187,7 @@ const SidebarModern = forwardRef(({
     return (
       <div className="sidebar-hidden-toggle">
         <button className="toggle-btn-visible" onClick={onToggleHide} title="展开侧边栏">
-          <img src={sideBarIcon} alt="Toggle sidebar" className="toggle-icon" />
+          <img src={sidebarIcon} alt="Toggle sidebar" className="toggle-icon" />
         </button>
       </div>
     );
@@ -211,7 +211,7 @@ const SidebarModern = forwardRef(({
           </button>
         </div>
         <button className="toggle-btn" onClick={onToggleHide} title="隐藏侧边栏">
-          <img src={sideBarIcon} alt="Toggle sidebar" className="toggle-icon" />
+          <img src={sidebarIcon} alt="Toggle sidebar" className="toggle-icon" />
         </button>
       </div>
 

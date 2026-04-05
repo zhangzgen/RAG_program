@@ -859,13 +859,14 @@
 }
 
 .thinking-arrow-modern {
-  font-size: 9px;
-  color: #9ca3af;
-  transition: transform 0.2s ease;
+  width: 8px;
+  height: 8px;
+  opacity: 0.75;
+  object-fit: contain;
 }
 
 .thinking-toggle-modern.expanded .thinking-arrow-modern {
-  transform: rotate(90deg);
+  opacity: 0.9;
 }
 
 .thinking-content-modern {
