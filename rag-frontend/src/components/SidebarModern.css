@@ -19,38 +19,39 @@
 
 .sidebar-hidden-toggle {
   position: fixed;
-  left: 0;
+  left: 10px;
   top: 10px;
   z-index: 1000;
-  padding: 8px 6px;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  border-radius: 0 6px 6px 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .toggle-btn-visible {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: #ffffff;
   color: #6b7280;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
 .toggle-btn-visible:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #d1d5db;
   color: #1f2937;
 }
 
 .toggle-btn-visible .toggle-icon {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   transform: rotate(180deg);
 }
 
@@ -495,6 +496,22 @@
 }
 
 @media (max-width: 768px) {
+  .sidebar-hidden-toggle {
+    left: 8px;
+    top: 8px;
+  }
+
+  .toggle-btn-visible {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+
+  .toggle-btn-visible .toggle-icon {
+    width: 11px;
+    height: 11px;
+  }
+
   .sidebar-modern {
     width: 100px;
     min-width: 100px;

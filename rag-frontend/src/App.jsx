@@ -156,8 +156,15 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const appContainerClassName = [
+    'app-modern-container',
+    isSidebarHidden ? 'sidebar-hidden' : '',
+    isSidebarCollapsed ? 'sidebar-collapsed' : '',
+    mode === 'professional' ? 'mode-professional' : ''
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`app-modern-container ${isSidebarHidden ? 'sidebar-hidden' : ''}`}>
+    <div className={appContainerClassName}>
       <SidebarModern
         ref={sidebarRef}
         currentSessionId={currentSessionId}

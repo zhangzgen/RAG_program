@@ -37,6 +37,10 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.app-modern-container.sidebar-hidden.mode-professional .main-modern-area {
+  padding-left: 44px;
+}
+
 #root {
   width: 100%;
   height: 100%;
@@ -123,6 +127,10 @@ code {
   
   .app-modern-container {
     overflow-x: hidden;
+  }
+
+  .app-modern-container.sidebar-hidden.mode-professional .main-modern-area {
+    padding-left: 38px;
   }
 }
 
