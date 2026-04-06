@@ -386,6 +386,14 @@ export const updateConversationStatus = async (conversationId, status) => {
   return response.data;
 };
 
+export const overwriteRegeneratedConversation = async (conversationId, answer, traceData = null) => {
+  const response = await api.patch(`/conversations/${conversationId}/regenerate`, {
+    answer,
+    trace_data: traceData,
+  });
+  return response.data;
+};
+
 export const getCases = async (status, page = 1, pageSize = 20) => {
   const response = await api.get('/cases', { params: { status, page, page_size: pageSize } });
   return response.data;

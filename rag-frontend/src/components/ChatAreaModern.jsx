@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, us
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { arrowDownIcon, arrowRightIcon, thinkingIcon } from '../assets/icons';
-import { queryAPI, createSession, updateConversationStatus } from '../api';
+import { queryAPI, createSession, updateConversationStatus, overwriteRegeneratedConversation } from '../api';
 import './ChatAreaModern.css';
 
 let messageIdCounter = 0;
@@ -87,6 +87,15 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     await streamRegenerate(userMessage, messageId, originalConversationId);
   };
 
+  const persistRegeneratedConversation = async (conversationId, answer) => {
+    if (!conversationId || !answer) return;
+    try {
+      await overwriteRegeneratedConversation(conversationId, answer, null);
+    } catch (err) {
+      console.error('重新生成结果覆盖数据库失败:', err);
+    }
+  };
+
   const streamRegenerate = async (userMessage, assistantMsgId, originalConversationId) => {
     setIsLoading(true);
     streamingIdRef.current = assistantMsgId;
@@ -94,7 +103,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     contentBufRef.current = '';
     let hasFinalized = false;
 
-    const finalizeRegenerate = () => {
+    const finalizeRegenerate = async () => {
       if (hasFinalized) return;
       hasFinalized = true;
       setIsLoading(false);
@@ -113,6 +122,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
             }
           : m
       ));
+      await persistRegeneratedConversation(originalConversationId, contentBufRef.current);
     };
 
     try {
@@ -138,7 +148,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
               scheduleFlush(assistantMsgId);
             }
             if (data.is_complete) {
-              finalizeRegenerate();
+              await finalizeRegenerate();
             }
           } catch (e) {
             console.error('Regenerate SSE parse error:', e);

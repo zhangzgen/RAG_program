@@ -432,6 +432,65 @@ class MysqlClient(object):
             logger.error(f'更新对话状态失败: {e}')
             self.connect.rollback()
             return False
+
+    def verify_conversation_owner(self, conversation_id, user_id):
+        """
+        验证对话是否属于指定用户
+
+        Args:
+            conversation_id: 对话ID
+            user_id: 用户ID
+
+        Returns:
+            bool: 属于返回True，否则返回False
+        """
+        try:
+            self.cursor.execute('''
+                SELECT c.id
+                FROM conversations c
+                INNER JOIN user_session us ON c.session_id = us.session_id
+                WHERE c.id = %s AND us.user_id = %s AND us.status = 1
+                LIMIT 1
+            ''', (conversation_id, user_id))
+            result = self.cursor.fetchone()
+            return result is not None
+        except Exception as e:
+            logger.error(f'验证对话所有权失败: {e}')
+            return False
+
+    def update_conversation_content(self, conversation_id, answer, trace_data=None):
+        """
+        覆盖更新对话内容（用于重新生成后替换数据库中的答案）
+
+        Args:
+            conversation_id: 对话ID
+            answer: 新答案
+            trace_data: 可选，新的trace_data
+
+        Returns:
+            bool: 更新成功返回True
+        """
+        try:
+            if trace_data is None:
+                self.cursor.execute('''
+                    UPDATE conversations
+                    SET answer = %s
+                    WHERE id = %s
+                ''', (answer, conversation_id))
+            else:
+                self.cursor.execute('''
+                    UPDATE conversations
+                    SET answer = %s, trace_data = %s
+                    WHERE id = %s
+                ''', (answer, trace_data, conversation_id))
+
+            self.connect.commit()
+            logger.info(f'对话内容更新成功: conversation_id={conversation_id}')
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'更新对话内容失败: {e}')
+            self.connect.rollback()
+            return False
     
     def get_conversations_by_status(self, status, limit=50, offset=0):
         """

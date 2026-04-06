@@ -477,6 +477,56 @@ async def update_conversation_status(
         raise HTTPException(status_code=500, detail=f"更新对话状态失败: {str(e)}")
 
 
+class RegenerateConversationRequest(BaseModel):
+    answer: str
+    trace_data: Optional[str] = None
+
+
+@app.patch("/conversations/{conversation_id}/regenerate")
+async def regenerate_conversation(
+    conversation_id: int,
+    request: RegenerateConversationRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    重新生成后覆盖对话答案（替换数据库中原内容，不新增记录）
+    需要在请求头中携带：Authorization: Bearer <token>
+    参数：
+        conversation_id: 对话ID
+        answer: 重新生成后的完整答案
+        trace_data: 可选，新的trace_data
+    返回：
+        成功消息
+    """
+    try:
+        user_id = user["user_id"]
+
+        if not request.answer or not request.answer.strip():
+            raise HTTPException(status_code=400, detail="answer不能为空")
+
+        if not qa_system.mysql_client.verify_conversation_owner(conversation_id, user_id):
+            raise HTTPException(status_code=403, detail="无权修改该对话")
+
+        success = qa_system.mysql_client.update_conversation_content(
+            conversation_id=conversation_id,
+            answer=request.answer.strip(),
+            trace_data=request.trace_data
+        )
+
+        if not success:
+            raise HTTPException(status_code=404, detail="对话不存在或更新失败")
+
+        return {
+            "message": "重新生成内容已覆盖原对话",
+            "conversation_id": conversation_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        qa_system.logger.error(f"覆盖更新对话失败: {e}")
+        raise HTTPException(status_code=500, detail=f"覆盖更新对话失败: {str(e)}")
+
+
 class CaseDetail(BaseModel):
     id: int
     session_id: str
@@ -1993,7 +2043,6 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 
 
 
