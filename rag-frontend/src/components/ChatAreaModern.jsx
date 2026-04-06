@@ -8,6 +8,22 @@ import './ChatAreaModern.css';
 let messageIdCounter = 0;
 const generateMessageId = () => `msg_${Date.now()}_${++messageIdCounter}`;
 
+const normalizeMarkdownForRender = (rawContent = '') => {
+  let content = String(rawContent).replace(/\r\n?/g, '\n');
+
+  const lineBreakCount = (content.match(/\n/g) || []).length;
+  const escapedLineBreakCount = (content.match(/\\n/g) || []).length;
+  if (escapedLineBreakCount > 0 && lineBreakCount === 0) {
+    content = content.replace(/\\n/g, '\n');
+  }
+  content = content.replace(/\\t/g, '\t');
+
+  // Normalize common malformed model output: "**1.xxx" (no closing "**")
+  content = content.replace(/^\s*\*\*(\d+\.[^*\n]+)\s*$/gm, '### $1');
+
+  return content;
+};
+
 const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -76,6 +92,29 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
     streamingIdRef.current = assistantMsgId;
     thinkingBufRef.current = '';
     contentBufRef.current = '';
+    let hasFinalized = false;
+
+    const finalizeRegenerate = () => {
+      if (hasFinalized) return;
+      hasFinalized = true;
+      setIsLoading(false);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId
+          ? {
+              ...m,
+              thinking: thinkingBufRef.current,
+              content: contentBufRef.current,
+              showThinking: false,
+              conversationId: originalConversationId
+            }
+          : m
+      ));
+    };
+
     try {
       // pass null session so backend does NOT save a new history record
       const stream = await queryAPI(userMessage, null, null);
@@ -91,6 +130,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           try {
+            if (hasFinalized) continue;
             const data = JSON.parse(line.slice(6));
             if (data.token) {
               if (data.token_type === 'thinking') thinkingBufRef.current += data.token;
@@ -98,13 +138,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
               scheduleFlush(assistantMsgId);
             }
             if (data.is_complete) {
-              setIsLoading(false);
-              if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-              setMessages(prev => prev.map(m =>
-                m.id === assistantMsgId
-                  ? { ...m, thinking: thinkingBufRef.current, content: contentBufRef.current, showThinking: false, conversationId: originalConversationId }
-                  : m
-              ));
+              finalizeRegenerate();
             }
           } catch (e) {
             console.error('Regenerate SSE parse error:', e);
@@ -265,6 +299,29 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
 
       let buffer = '';
       let streamComplete = false;
+      let hasFinalized = false;
+
+      const finalizeStream = (conversationId) => {
+        if (hasFinalized) return;
+        hasFinalized = true;
+        streamComplete = true;
+        setIsLoading(false);
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                thinking: thinkingBufRef.current,
+                content: contentBufRef.current,
+                showThinking: false,
+                conversationId: conversationId || m.conversationId,
+              }
+            : m
+        ));
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -277,6 +334,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           try {
+            if (hasFinalized) continue;
             const data = JSON.parse(line.slice(6));
             if (data.error) {
               throw new Error(data.error);
@@ -292,23 +350,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
             }
 
             if (data.is_complete) {
-              streamComplete = true;
-              setIsLoading(false);
-              if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current);
-                rafIdRef.current = null;
-              }
-              setMessages(prev => prev.map(m =>
-                m.id === assistantMsgId
-                  ? {
-                      ...m,
-                      thinking: thinkingBufRef.current,
-                      content: contentBufRef.current,
-                      showThinking: false,
-                      conversationId: data.conversation_id || m.conversationId,
-                    }
-                  : m
-              ));
+              finalizeStream(data.conversation_id);
             }
           } catch (e) {
             console.error('Error parsing SSE data:', e);
@@ -329,6 +371,12 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
       if (buffer.trim().startsWith('data: ')) {
         try {
           const data = JSON.parse(buffer.trim().slice(6));
+          if (hasFinalized) {
+            if (onSessionCreated) {
+              onSessionCreated(currentSessionId);
+            }
+            return;
+          }
           if (data.token) {
             if (data.token_type === 'thinking') {
               thinkingBufRef.current += data.token;
@@ -337,19 +385,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
             }
           }
           if (data.is_complete) {
-            streamComplete = true;
-            setIsLoading(false);
-            setMessages(prev => prev.map(m =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    thinking: thinkingBufRef.current,
-                    content: contentBufRef.current,
-                    showThinking: false,
-                    conversationId: data.conversation_id || m.conversationId,
-                  }
-                : m
-            ));
+            finalizeStream(data.conversation_id);
           }
         } catch (e) {
           console.error('Error parsing remaining buffer:', e);
@@ -411,9 +447,11 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
 
         {messages.map((message, index) => {
           const isLastMessage = index === messages.length - 1;
-          const isStreaming = isLoading && isLastMessage && message.role === 'assistant' && !message.content && !message.thinking;
-          const isStreamingContent = isLoading && isLastMessage && message.role === 'assistant' && message.content;
+          const isCurrentStreamingMessage = isLoading && message.id === streamingIdRef.current;
+          const isStreaming = isCurrentStreamingMessage && message.role === 'assistant' && !message.content && !message.thinking;
+          const isStreamingContent = isCurrentStreamingMessage && message.role === 'assistant' && !!message.content;
           const messageKey = message.id || `msg_${index}`;
+          const normalizedMessageContent = normalizeMarkdownForRender(message.content || '');
           
           return (
             <div
@@ -474,10 +512,9 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                       {message.role === 'assistant' ? (
                         <div className="message-text-modern markdown-content">
                           <ReactMarkdown
-                            key={message.id}
                             remarkPlugins={[remarkGfm]}
                             skipHtml={true}
-                            components={isStreamingContent ? undefined : {
+                            components={{
                               pre({ children, ...props }) {
                                 const extractText = (node) => {
                                   if (typeof node === 'string') return node;
@@ -506,7 +543,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                               }
                             }}
                           >
-                            {message.content || ''}
+                            {normalizedMessageContent}
                           </ReactMarkdown>
                           {(isStreaming || isStreamingContent) && <span className="streaming-cursor"></span>}
                         </div>

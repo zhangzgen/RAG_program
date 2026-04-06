@@ -96,7 +96,7 @@
   display: flex;
   gap: 10px;
   width: 100%;
-  max-width: 608px;
+  max-width: 517px;
   min-height: fit-content;
   clear: both;
   position: relative;
@@ -181,9 +181,9 @@
 }
 
 .message-text-modern {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 12px;
-  font-size: 7.8px;
+  font-size: 6.6px;
   line-height: 1.4;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -571,7 +571,7 @@
   line-height: 1.4;
   max-width: 100%;
   overflow: visible;
-  font-size: 7.8px;
+  font-size: 6.6px;
 }
 
 .markdown-content h1,
