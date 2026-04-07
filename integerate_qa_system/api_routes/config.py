@@ -2,12 +2,30 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from base.config import Config
+from base import Config
 
-from .shared import ConfigUpdateRequest, compare_configs, get_current_user, parse_config_content, qa_system
+from .shared import ConfigUpdateRequest, auth_service, compare_configs, email_service, get_current_user, parse_config_content, qa_system
 
 
 router = APIRouter()
+
+
+def _apply_runtime_reload(changed_items):
+    Config.hot_reload()
+    changed_sections = {section for section, _ in changed_items}
+
+    if "llm" in changed_sections:
+        try:
+            qa_system.config = Config()
+            qa_system.reload_llm_client()
+        except Exception as exc:
+            qa_system.logger.warning(f"Failed to hot reload llm client: {exc}")
+
+    if "jwt" in changed_sections:
+        auth_service.reload_config()
+
+    if "email" in changed_sections:
+        email_service.reload_config()
 
 
 @router.get("/config")
@@ -125,7 +143,7 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
             changed_by=request.changed_by,
         )
 
-        Config.hot_reload()
+        _apply_runtime_reload(changed_items)
 
         reloaded_items = []
         not_reloaded_items = []
@@ -211,7 +229,7 @@ async def rollback_config(version_id: int, user: dict = Depends(get_current_user
             f.write(version["config_content"])
 
         rollback_result = qa_system.mysql_client.rollback_config(version_id)
-        Config.hot_reload()
+        _apply_runtime_reload(changed_items)
 
         reloaded_items = []
         not_reloaded_items = []

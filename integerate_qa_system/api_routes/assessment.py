@@ -109,7 +109,7 @@ async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get
             from ragas.embeddings import LangchainEmbeddingsWrapper
             from ragas.llms import LangchainLLMWrapper
             from ragas.metrics import answer_relevancy, context_precision, context_recall, faithfulness
-            from base.config import Config
+            from base import Config
 
             with open(file_path, "r", encoding="utf-8") as f:
                 data = _json.load(f)

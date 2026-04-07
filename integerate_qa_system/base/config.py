@@ -41,13 +41,16 @@ class Config:
         return cls._instance
     
     def __init__(self, config_file=config_file_abspath):
-        if Config._config_cache is not None and not hasattr(self, '_force_reload'):
+        force_reload = hasattr(self, '_force_reload')
+        if Config._config_cache is not None and not force_reload:
             self.__dict__.update(Config._config_cache)
             return
             
         self.config = configparser.ConfigParser()
         self.config.read(config_file, encoding='utf-8')
         self._load_all_config()
+        if force_reload and hasattr(self, '_force_reload'):
+            delattr(self, '_force_reload')
         Config._config_cache = self.__dict__.copy()
     
     def _load_all_config(self):
@@ -131,6 +134,8 @@ class Config:
         instance = cls.__new__(cls)
         instance._force_reload = True
         instance.__init__(config_file)
+        if hasattr(instance, '_force_reload'):
+            delattr(instance, '_force_reload')
         
         reloaded = []
         not_reloaded = []
@@ -155,4 +160,3 @@ class Config:
 if __name__ == '__main__':
     conf = Config()
     print(conf.CHILD_CHUNK_SIZE)
-

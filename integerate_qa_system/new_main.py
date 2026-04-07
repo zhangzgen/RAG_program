@@ -80,7 +80,7 @@ class IntegratedQASystem:
         token_type: 'thinking' 思考过程 | 'answer' 正式回答
         """
         try:
-            from base.config import Config
+            from base import Config
             current_config = Config()
 
             api_key = current_config.LLM_API_KEY or current_config.DASHSCOPE_API_KEY

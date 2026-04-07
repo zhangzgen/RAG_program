@@ -1,5 +1,5 @@
 import logging
-from config import Config
+from .config import Config
 import os
 
 # 获取日志文件目录
