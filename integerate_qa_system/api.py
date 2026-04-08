@@ -33,8 +33,8 @@ from api_routes.shared import (
 )
 
 app = FastAPI(
-    title="闆嗘垚闂瓟绯荤粺 API",
-    description="鍩轰簬 RAG + MySQL + Redis 鐨勯棶绛旂郴缁熺殑 FastAPI 鎺ュ彛",
+    title="集成问答系统 API",
+    description="基于 RAG + MySQL + Redis 的问答系统的 FastAPI 接口",
 )
 
 app.add_middleware(
@@ -59,13 +59,13 @@ register_routers(app)
 async def startup_event():
     try:
         qa_system.mysql_client.create_knowledge_tables()
-        qa_system.logger.info("鐭ヨ瘑搴撹〃鍒濆鍖栧畬鎴�")
+        qa_system.logger.info("知识库表初始化完成")
         qa_system.mysql_client.create_config_version_table()
-        qa_system.logger.info("閰嶇疆鐗堟湰琛ㄥ垵濮嬪寲瀹屾垚")
+        qa_system.logger.info("配置版本表初始化完成")
         qa_system.mysql_client.create_assessment_tables()
-        qa_system.logger.info("璇勪及鐩稿叧琛ㄥ垵濮嬪鍖栧畬鎴�")
+        qa_system.logger.info("评估相关表初始化完成")
     except Exception as e:
-        qa_system.logger.error(f"鐭ヨ瘑搴撹〃鍒濆鍖栧け璐� {e}")
+        qa_system.logger.error(f"知识库表初始化失败: {e}")
 
 
 if __name__ == "__main__":
