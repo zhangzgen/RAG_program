@@ -432,6 +432,42 @@ export const overwriteRegeneratedConversation = async (conversationId, answer, t
   return response.data;
 };
 
+export const regenerateConversationStream = async (conversationId) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/regenerate/stream`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+        throw new Error('未授权，请重新登录');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.body;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('请求超时，请稍后重试');
+    }
+    throw error;
+  }
+};
+
 export const getCases = async (status, page = 1, pageSize = 20) => {
   const response = await api.get('/cases', { params: { status, page, page_size: pageSize } });
   return response.data;

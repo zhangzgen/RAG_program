@@ -322,12 +322,21 @@ class MysqlClient(object):
         """
         try:
             query = '''
-                SELECT us.session_id, MAX(c.created_at) as last_active
+                SELECT
+                    us.session_id,
+                    MAX(c.created_at) as last_active,
+                    (
+                        SELECT c1.query
+                        FROM conversations c1
+                        WHERE c1.session_id = us.session_id
+                        ORDER BY c1.created_at ASC, c1.id ASC
+                        LIMIT 1
+                    ) as first_query
                 FROM user_session us
                 LEFT JOIN conversations c ON us.session_id = c.session_id
                 WHERE us.user_id = %s AND us.status = 1
                 GROUP BY us.session_id
-                ORDER BY last_active DESC
+                ORDER BY last_active DESC, us.id DESC
                 LIMIT %s
             '''
             self.cursor.execute(query, (user_id, limit))
@@ -336,6 +345,41 @@ class MysqlClient(object):
             return sessions
         except Exception as e:
             logger.error(f'用户会话查询失败: {e}')
+            return []
+
+    def get_history_before_conversation(self, conversation_id, limit=5):
+        """
+        获取指定对话之前的历史对话，按时间正序返回。
+
+        Args:
+            conversation_id: 当前对话ID
+            limit: 历史对话条数限制
+
+        Returns:
+            list[dict]: 历史问答列表
+        """
+        try:
+            self.cursor.execute('''
+                SELECT previous.query, previous.answer
+                FROM conversations AS current_conv
+                INNER JOIN conversations AS previous
+                    ON previous.session_id = current_conv.session_id
+                WHERE current_conv.id = %s
+                  AND (
+                    previous.created_at < current_conv.created_at
+                    OR (
+                        previous.created_at = current_conv.created_at
+                        AND previous.id < current_conv.id
+                    )
+                  )
+                ORDER BY previous.created_at DESC, previous.id DESC
+                LIMIT %s
+            ''', (conversation_id, limit))
+            rows = self.cursor.fetchall()
+            history = [{'query': row[0], 'answer': row[1]} for row in rows]
+            return history[::-1]
+        except Exception as e:
+            logger.error(f'获取指定对话之前历史失败: {e}')
             return []
     
     def soft_delete_session(self, session_id, user_id):

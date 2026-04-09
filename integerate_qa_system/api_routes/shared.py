@@ -41,6 +41,7 @@ class Conversation(BaseModel):
 class SessionInfo(BaseModel):
     session_id: str
     last_active: str
+    first_query: Optional[str] = None
 
 
 class SessionDetail(BaseModel):

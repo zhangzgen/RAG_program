@@ -4,9 +4,8 @@
 
 ## 核心功能
 
-- 邮箱验证码登录
-- JWT 鉴权
-- 问答会话与历史记录
+- 邮箱验证码登录与 JWT 鉴权
+- 问答会话与历史记录管理
 - FAQ/FQA 快速命中
 - RAG 检索与流式回答
 - 知识库分类、上传、预览、切片、向量检索
@@ -16,28 +15,65 @@
 
 ## 管理员权限说明
 
-本次已接入 `user.is_admin` 字段：
+系统已接入 `user.is_admin` 字段：
 
-- 字段含义：`0` 表示普通用户，`1` 表示管理员
-- 后端启动时会自动确保 `user` 表存在 `is_admin` 字段；新用户默认值为 `0`
-- `POST /login` 和 `GET /verify-token` 现在都会返回 `is_admin`
-- `get_current_user` 会在每次鉴权时根据 `user_id` 回查数据库，实时带出最新管理员状态
+- `0` 表示普通用户，`1` 表示管理员
+- 服务启动时会自动确保 `user` 表存在 `is_admin` 字段，新用户默认值为 `0`
+- `POST /login` 和 `GET /verify-token` 都会返回 `is_admin`
+- 鉴权依赖会根据 `user_id` 回查数据库，实时获取最新管理员状态，而不是只依赖旧 token
 
-只有管理员可访问以下“专业模式”相关接口：
+只有管理员可以访问以下“专业模式”相关接口：
 
-- 知识库：`/knowledge/**`
-- 配置中心：`/config/**`
-- FAQ 管理：`/faq/**`
-- Case 分析：`/cases/**`
-- 系统评估：`/assessment/**`
-- 对话状态标记：`PATCH /conversations/{conversation_id}/status`
+- `/knowledge/**`
+- `/config/**`
+- `/faq/**`
+- `/cases/**`
+- `/assessment/**`
+- `PATCH /conversations/{conversation_id}/status`
 
-普通登录用户仍可访问：
+普通用户仍可访问：
 
 - `POST /query`
 - `/sessions/**`
 - `PATCH /conversations/{conversation_id}/regenerate`
+- `POST /conversations/{conversation_id}/regenerate/stream`
 - 登录与鉴权相关接口
+
+## 本次更新
+
+### 1. 会话列表标题
+
+`GET /sessions` 现在会返回：
+
+- `session_id`
+- `last_active`
+- `first_query`
+
+其中 `first_query` 为当前会话第一条用户提问，供前端侧边栏展示使用，不再需要直接显示会话 ID。
+
+### 2. 重新生成接口
+
+新增流式重新生成接口：
+
+- `POST /conversations/{conversation_id}/regenerate/stream`
+
+处理逻辑如下：
+
+- 先校验当前用户是否拥有该对话
+- 根据 `conversation_id` 读取当前问答
+- 按 `session_id` 和“当前对话创建时间之前”的条件自动提取历史上下文
+- 调用问答主流程重新生成答案
+- 生成完成后按原 `conversation_id` 直接覆盖数据库中的 `answer` 和 `trace_data`
+
+这意味着重新生成不会再额外插入一条新问答记录，而是替换原记录内容。
+
+### 3. 历史上下文拼接
+
+问答主流程新增统一历史文本构造与结果持久化逻辑：
+
+- 支持普通提问时新增对话记录
+- 支持重新生成时覆盖已有对话记录
+- RAG 与直答模式都会复用统一的历史上下文拼接逻辑
 
 ## 目录结构
 
@@ -106,8 +142,6 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 系统启动时会自动初始化或补齐以下核心表：
 
 - `user`
-  - 用户邮箱
-  - `is_admin` 管理员标记
 - `user_session`
 - `conversations`
 - `category`
@@ -117,7 +151,7 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 - `assessment_result`
 - `jpkb`
 
-如果你需要手动授予管理员权限，可以直接更新 `user` 表：
+如果需要手动授予管理员权限，可以直接更新 `user` 表：
 
 ```sql
 UPDATE user
@@ -141,6 +175,7 @@ WHERE email = 'admin@example.com';
 - `GET /sessions/{session_id}`
 - `DELETE /sessions/{session_id}`
 - `PATCH /conversations/{conversation_id}/regenerate`
+- `POST /conversations/{conversation_id}/regenerate/stream`
 
 ### 管理员接口
 
@@ -154,5 +189,5 @@ WHERE email = 'admin@example.com';
 ## 开发说明
 
 - 管理员权限由后端强校验，前端不可替代后端鉴权
-- 修改用户管理员身份后，无需等 JWT 过期，下一次请求会按数据库最新状态生效
-- 专业模式功能变更时，请同步更新前端 `README.md`
+- 修改用户管理员身份后，无需等待 JWT 过期，下次请求会按数据库最新状态生效
+- 若专业模式接口有新增或变更，请同步更新前端和后端 README

@@ -156,6 +156,43 @@ class IntegratedQASystem:
         # 调用 _fetch_recent_history 获取对话历史
         return self._fetch_recent_history(session_id)
 
+    def _build_history_text(self, history: list) -> str:
+        """将历史问答转换为提示词文本。"""
+        if not history:
+            return ""
+
+        lines = []
+        for entry in history:
+            lines.append(f"用户: {entry.get('query', '')}")
+            lines.append(f"助手: {entry.get('answer', '')}")
+
+        return "\n".join(lines)
+
+    def _persist_generated_result(
+        self,
+        session_id: str = None,
+        question: str = "",
+        answer: str = "",
+        trace_data: str = None,
+        replace_conversation_id: int = None,
+    ):
+        """保存新答案，或在重新生成时覆盖原答案。"""
+        if replace_conversation_id:
+            updated = self.mysql_client.update_conversation_content(
+                conversation_id=replace_conversation_id,
+                answer=answer,
+                trace_data=trace_data,
+            )
+            if not updated:
+                raise ValueError(f"Failed to update conversation: {replace_conversation_id}")
+            return replace_conversation_id
+
+        if session_id:
+            result = self.update_session_history(session_id, question, answer, trace_data)
+            return result.get('conversation_id')
+
+        return None
+
     def update_session_history(self, session_id: str, question: str, answer: str, trace_data: str = None) -> dict:
         """更新会话历史到MySQL，保留最近5轮对话，返回包含conversation_id的字典"""
         try:
@@ -221,7 +258,7 @@ class IntegratedQASystem:
             # 返回 False 表示失败
             return False
 
-    def query(self, query, source_filter=None, session_id=None):
+    def query(self, query, source_filter=None, session_id=None, history=None, replace_conversation_id=None):
         """查询集成系统，支持对话历史和流式输出，记录trace数据"""
         # 初始化 trace 数据对象
         trace = TraceData(
@@ -233,7 +270,7 @@ class IntegratedQASystem:
         # 记录查询信息到日志
         self.logger.info(f"处理查询: '{query}' (会话ID: {session_id})")
         # 获取对话历史，若无 session_id 则返回空列表
-        history = self.get_session_history(session_id) if session_id else []
+        history = history if history is not None else (self.get_session_history(session_id) if session_id else [])
         
         # ===== Step 1: FQA搜索 (BM25) =====
         trace.fqa.start()
@@ -246,10 +283,13 @@ class IntegratedQASystem:
                 trace.finish(answer=answer, source='fqa')
                 
                 self.logger.info(f"FQA答案: {answer}")
-                conversation_id = None
-                if session_id:
-                    result = self.update_session_history(session_id, query, answer, trace.to_json())
-                    conversation_id = result.get('conversation_id')
+                conversation_id = self._persist_generated_result(
+                    session_id=session_id,
+                    question=query,
+                    answer=answer,
+                    trace_data=trace.to_json(),
+                    replace_conversation_id=replace_conversation_id,
+                )
                 yield 'answer', answer, True, conversation_id
                 return
             else:
@@ -288,8 +328,8 @@ class IntegratedQASystem:
             collected_thinking = ""
             try:
                 # 格式化对话历史
-                history_text = ""
-                if history:
+                history_text = self._build_history_text(history)
+                if False and history:
                     for i in range(0, len(history), 2):
                         entry = history[i]
                         history_text += f"用户: {entry.get('query', '')}\n助手: {entry.get('answer', '')}\n"
@@ -313,10 +353,13 @@ class IntegratedQASystem:
                 yield 'answer', collected_answer, True
 
             trace.finish(answer=collected_answer, source='llm_direct')
-            conversation_id = None
-            if session_id:
-                result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
-                conversation_id = result.get('conversation_id')
+            conversation_id = self._persist_generated_result(
+                session_id=session_id,
+                question=query,
+                answer=collected_answer,
+                trace_data=trace.to_json(),
+                replace_conversation_id=replace_conversation_id,
+            )
             yield 'complete', '', True, conversation_id
             return
         
@@ -381,8 +424,8 @@ class IntegratedQASystem:
         trace.llm.is_thinking_model = self.config.is_thinking_model()
         
         # 格式化对话历史
-        history_text = ""
-        if history:
+        history_text = self._build_history_text(history)
+        if False and history:
             for i in range(len(history)):
                 entry = history[i]
                 history_text += f"用户: {entry.get('query', '')}\n助手: {entry.get('answer', '')}\n"
@@ -413,10 +456,13 @@ class IntegratedQASystem:
         # 完成trace
         trace.finish(answer=collected_answer, source='rag')
 
-        conversation_id = None
-        if session_id:
-            result = self.update_session_history(session_id, query, collected_answer, trace.to_json())
-            conversation_id = result.get('conversation_id')
+        conversation_id = self._persist_generated_result(
+            session_id=session_id,
+            question=query,
+            answer=collected_answer,
+            trace_data=trace.to_json(),
+            replace_conversation_id=replace_conversation_id,
+        )
 
         yield 'complete', '', True, conversation_id
 

@@ -141,7 +141,14 @@ const SidebarModern = forwardRef(({
     onCategorySelect(category);
   };
 
-  const getSessionTitle = (session) => `对话 ${session.session_id.slice(0, 8)}`;
+  const getSessionTitle = (session) => {
+    const firstQuery = String(session.first_query || '').trim();
+    if (!firstQuery) {
+      return '新对话';
+    }
+
+    return firstQuery.length > 24 ? `${firstQuery.slice(0, 24)}...` : firstQuery;
+  };
 
   const sortedSessions = useMemo(() => {
     if (!sessions || sessions.length === 0) {
