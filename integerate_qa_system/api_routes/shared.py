@@ -61,6 +61,7 @@ class LoginResponse(BaseModel):
     token: str
     user_id: int
     email: str
+    is_admin: int
     message: str
 
 
@@ -149,7 +150,27 @@ async def get_current_user(request: Request):
     if not payload:
         raise HTTPException(status_code=401, detail="令牌无效或已过期，请重新登录")
 
-    return payload
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="令牌缺少用户信息")
+
+    user = qa_system.mysql_client.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户不存在，请重新登录")
+
+    return {
+        **payload,
+        "user_id": user["id"],
+        "email": user["email"],
+        "is_admin": int(user.get("is_admin", 0)),
+    }
+
+
+async def get_current_admin(user: dict = Depends(get_current_user)):
+    if int(user.get("is_admin", 0)) != 1:
+        raise HTTPException(status_code=403, detail="仅管理员可访问该接口")
+
+    return user
 
 
 def parse_config_content(content):

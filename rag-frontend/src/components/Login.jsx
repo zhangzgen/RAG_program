@@ -74,7 +74,8 @@ function Login({ onLoginSuccess }) {
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify({
         user_id: response.user_id,
-        email: response.email
+        email: response.email,
+        is_admin: Number(response.is_admin || 0),
       }));
 
       // 通知父组件登录成功

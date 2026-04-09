@@ -10,6 +10,18 @@ import Login from './components/Login';
 import { verifyToken } from './api';
 import './AppModern.css';
 
+const normalizeUser = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    user_id: user.user_id,
+    email: user.email,
+    is_admin: Number(user.is_admin || 0),
+  };
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -34,8 +46,10 @@ function App() {
         try {
           const result = await verifyToken();
           if (result.valid) {
+            const verifiedUser = normalizeUser(result);
             setIsAuthenticated(true);
-            setCurrentUser(JSON.parse(userStr));
+            setCurrentUser(verifiedUser);
+            localStorage.setItem('user', JSON.stringify(verifiedUser));
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
@@ -63,11 +77,29 @@ function App() {
       setIsSidebarHidden(JSON.parse(savedHidden));
     }
     
-    const savedMode = localStorage.getItem('appMode');
-    if (savedMode) {
-      setMode(savedMode);
-    }
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setMode('qa');
+      return;
+    }
+
+    const savedMode = localStorage.getItem('appMode');
+    const isAdmin = Number(currentUser.is_admin || 0) === 1;
+    const nextMode = isAdmin && savedMode === 'professional' ? 'professional' : 'qa';
+
+    setMode(nextMode);
+
+    if (nextMode !== savedMode) {
+      localStorage.setItem('appMode', nextMode);
+    }
+
+    if (!isAdmin) {
+      setSelectedCategory(null);
+      setProfessionalTab('knowledge');
+    }
+  }, [currentUser]);
 
   const handleToggleCollapse = () => {
     const newState = !isSidebarCollapsed;
@@ -99,10 +131,11 @@ function App() {
 
   const handleLoginSuccess = (response) => {
     setIsAuthenticated(true);
-    setCurrentUser({
+    setCurrentUser(normalizeUser({
       user_id: response.user_id,
-      email: response.email
-    });
+      email: response.email,
+      is_admin: response.is_admin,
+    }));
   };
 
   const handleLogout = () => {
@@ -112,9 +145,17 @@ function App() {
     setCurrentUser(null);
     setCurrentSessionId('');
     setSessionData(null);
+    setSelectedCategory(null);
+    setProfessionalTab('knowledge');
+    setMode('qa');
   };
 
   const handleModeChange = (newMode) => {
+    const isAdmin = Number(currentUser?.is_admin || 0) === 1;
+    if (newMode === 'professional' && !isAdmin) {
+      return;
+    }
+
     setMode(newMode);
     localStorage.setItem('appMode', newMode);
     setIsSidebarCollapsed(false);
@@ -156,11 +197,13 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const isAdmin = Number(currentUser?.is_admin || 0) === 1;
+  const currentMode = mode === 'professional' && isAdmin ? 'professional' : 'qa';
   const appContainerClassName = [
     'app-modern-container',
     isSidebarHidden ? 'sidebar-hidden' : '',
     isSidebarCollapsed ? 'sidebar-collapsed' : '',
-    mode === 'professional' ? 'mode-professional' : ''
+    currentMode === 'professional' ? 'mode-professional' : ''
   ].filter(Boolean).join(' ');
 
   return (
@@ -174,8 +217,9 @@ function App() {
         onToggleCollapse={handleToggleCollapse}
         onLoadSession={handleLoadSession}
         currentUser={currentUser}
+        isAdmin={isAdmin}
         onLogout={handleLogout}
-        mode={mode}
+        mode={currentMode}
         onModeChange={handleModeChange}
         isHidden={isSidebarHidden}
         onToggleHide={handleToggleHide}
@@ -186,11 +230,12 @@ function App() {
       />
       
       <div className="main-modern-area">
-        {mode === 'qa' ? (
+        {currentMode === 'qa' ? (
           <ChatAreaModern
             ref={chatAreaRef}
             sessionData={sessionData}
             onSessionCreated={handleSessionCreated}
+            isAdmin={isAdmin}
           />
         ) : (
           professionalTab === 'knowledge' ? (

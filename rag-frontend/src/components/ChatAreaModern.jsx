@@ -24,7 +24,7 @@ const normalizeMarkdownForRender = (rawContent = '') => {
   return content;
 };
 
-const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
+const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated, isAdmin }, ref) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -585,7 +585,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated }, ref) => {
                           >
                             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 .49-3.85"></path></svg>
                           </button>
-                          {message.conversationId && (<>
+                          {isAdmin && message.conversationId && (<>
                           <button
                             className={`feedback-btn-modern like-btn ${messageStatus[message.conversationId] === 1 ? 'active' : ''}`}
                             onClick={() => handleStatusUpdate(message.conversationId, messageStatus[message.conversationId] === 1 ? 0 : 1)}

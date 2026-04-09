@@ -48,12 +48,14 @@ async def login(request: LoginRequest):
     redis_client.client.delete(redis_key)
 
     user_id = qa_system.mysql_client.get_or_create_user(email)
+    user = qa_system.mysql_client.get_user_by_id(user_id)
     token = auth_service.generate_token(user_id, email)
 
     return LoginResponse(
         token=token,
         user_id=user_id,
         email=email,
+        is_admin=int(user["is_admin"]) if user else 0,
         message="登录成功",
     )
 
@@ -64,4 +66,5 @@ async def verify_token(user: dict = Depends(get_current_user)):
         "valid": True,
         "user_id": user["user_id"],
         "email": user["email"],
+        "is_admin": int(user.get("is_admin", 0)),
     }

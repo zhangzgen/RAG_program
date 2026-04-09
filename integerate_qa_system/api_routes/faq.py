@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from .shared import FAQCreate, get_current_user, qa_system
+from .shared import FAQCreate, get_current_admin, qa_system
 
 
 router = APIRouter()
 
 
 @router.get("/faq")
-async def get_faqs(search: str = None, user: dict = Depends(get_current_user)):
+async def get_faqs(search: str = None, user: dict = Depends(get_current_admin)):
     try:
         faqs = qa_system.mysql_client.get_all_faqs(search_keyword=search)
         return {"faqs": faqs}
@@ -17,7 +17,7 @@ async def get_faqs(search: str = None, user: dict = Depends(get_current_user)):
 
 
 @router.get("/faq/{faq_id}")
-async def get_faq(faq_id: int, user: dict = Depends(get_current_user)):
+async def get_faq(faq_id: int, user: dict = Depends(get_current_admin)):
     try:
         faq = qa_system.mysql_client.get_faq_by_id(faq_id)
         if not faq:
@@ -31,7 +31,7 @@ async def get_faq(faq_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.post("/faq")
-async def create_faq(faq: FAQCreate, user: dict = Depends(get_current_user)):
+async def create_faq(faq: FAQCreate, user: dict = Depends(get_current_admin)):
     try:
         faq_id = qa_system.mysql_client.add_faq(
             faq.subject_name,
@@ -45,7 +45,7 @@ async def create_faq(faq: FAQCreate, user: dict = Depends(get_current_user)):
 
 
 @router.put("/faq/{faq_id}")
-async def update_faq(faq_id: int, faq: FAQCreate, user: dict = Depends(get_current_user)):
+async def update_faq(faq_id: int, faq: FAQCreate, user: dict = Depends(get_current_admin)):
     try:
         success = qa_system.mysql_client.update_faq(
             faq_id,
@@ -64,7 +64,7 @@ async def update_faq(faq_id: int, faq: FAQCreate, user: dict = Depends(get_curre
 
 
 @router.delete("/faq/{faq_id}")
-async def delete_faq(faq_id: int, user: dict = Depends(get_current_user)):
+async def delete_faq(faq_id: int, user: dict = Depends(get_current_admin)):
     try:
         success = qa_system.mysql_client.delete_faq(faq_id)
         if not success:

@@ -5,14 +5,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 
-from .shared import ASSESSMENT_UPLOAD_DIR, AssessmentRunRequest, get_current_user, qa_system
+from .shared import ASSESSMENT_UPLOAD_DIR, AssessmentRunRequest, get_current_admin, qa_system
 
 
 router = APIRouter()
 
 
 @router.post("/assessment/upload")
-async def upload_assessment_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def upload_assessment_file(file: UploadFile = File(...), user: dict = Depends(get_current_admin)):
     if not file.filename or not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=400, detail="仅支持.json 格式的评估数据文件")
 
@@ -41,7 +41,7 @@ async def upload_assessment_file(file: UploadFile = File(...), user: dict = Depe
 
 
 @router.get("/assessment/files")
-async def list_assessment_files(user: dict = Depends(get_current_user)):
+async def list_assessment_files(user: dict = Depends(get_current_admin)):
     files = qa_system.mysql_client.get_assessment_files()
     return [
         {
@@ -55,7 +55,7 @@ async def list_assessment_files(user: dict = Depends(get_current_user)):
 
 
 @router.get("/assessment/files/{file_id}")
-async def get_assessment_file(file_id: str, user: dict = Depends(get_current_user)):
+async def get_assessment_file(file_id: str, user: dict = Depends(get_current_admin)):
     file_info = qa_system.mysql_client.get_assessment_file_by_id(file_id)
     if not file_info:
         raise HTTPException(status_code=404, detail="评估文件不存在")
@@ -77,12 +77,12 @@ async def get_assessment_file(file_id: str, user: dict = Depends(get_current_use
 
 
 @router.get("/assessment/results")
-async def list_assessment_results(limit: int = 50, user: dict = Depends(get_current_user)):
+async def list_assessment_results(limit: int = 50, user: dict = Depends(get_current_admin)):
     return qa_system.mysql_client.get_assessment_results(limit)
 
 
 @router.get("/assessment/results/{result_id}")
-async def get_assessment_result(result_id: str, user: dict = Depends(get_current_user)):
+async def get_assessment_result(result_id: str, user: dict = Depends(get_current_admin)):
     result = qa_system.mysql_client.get_assessment_result_by_id(result_id)
     if not result:
         raise HTTPException(status_code=404, detail="评估结果不存在")
@@ -90,7 +90,7 @@ async def get_assessment_result(result_id: str, user: dict = Depends(get_current
 
 
 @router.post("/assessment/run")
-async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get_current_user)):
+async def run_assessment(request: AssessmentRunRequest, user: dict = Depends(get_current_admin)):
     file_info = qa_system.mysql_client.get_assessment_file_by_id(request.file_id)
     if not file_info:
         raise HTTPException(status_code=404, detail="评估文件不存在，请先上传")

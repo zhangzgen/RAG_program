@@ -10,11 +10,47 @@ export const api = axios.create({
   timeout: 30000,
 });
 
+const ADMIN_API_PATTERNS = [
+  /^\/knowledge(?:\/|$)/,
+  /^\/config(?:\/|$)/,
+  /^\/faq(?:\/|$)/,
+  /^\/cases(?:\/|$)/,
+  /^\/assessment(?:\/|$)/,
+  /^\/conversations\/\d+\/status$/,
+];
+
+const getStoredUser = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || typeof user !== 'object') {
+      return null;
+    }
+    return user;
+  } catch (error) {
+    return null;
+  }
+};
+
+const hasAdminAccess = () => Number(getStoredUser()?.is_admin || 0) === 1;
+
+const ensureAdminAccess = () => {
+  if (!hasAdminAccess()) {
+    throw new Error('仅管理员可访问专业模式相关功能');
+  }
+};
+
+const isAdminApiRequest = (url = '') => {
+  return ADMIN_API_PATTERNS.some((pattern) => pattern.test(url));
+};
+
 api.interceptors.request.use(
   config => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (isAdminApiRequest(config.url || '')) {
+      ensureAdminAccess();
     }
     return config;
   },
@@ -230,6 +266,7 @@ export const getKnowledgeSources = async () => {
 };
 
 export const chunkFiles = async (fileIds = [], categoryId = null, onProgress, onComplete, onError) => {
+  ensureAdminAccess();
   const token = localStorage.getItem('token');
   
   return new Promise((resolve, reject) => {
@@ -264,6 +301,7 @@ export const chunkFiles = async (fileIds = [], categoryId = null, onProgress, on
 };
 
 export const chunkFilesPost = async (fileIds = [], categoryId = null, onMessage) => {
+  ensureAdminAccess();
   const token = localStorage.getItem('token');
   
   const response = await fetch(`${API_BASE_URL}/knowledge/chunk`, {
@@ -456,6 +494,7 @@ export const getAssessmentResultDetail = async (resultId) => {
 };
 
 export const runAssessment = async (fileId, onEvent) => {
+  ensureAdminAccess();
   const token = localStorage.getItem('token');
   const controller = new AbortController();
 

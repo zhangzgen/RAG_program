@@ -13,6 +13,7 @@ from .shared import (
     UploadFileResponse,
     VectorIdRequest,
     VectorSearchRequest,
+    get_current_admin,
     get_current_user,
     qa_system,
 )
@@ -32,7 +33,7 @@ IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".
 
 
 @router.get("/knowledge/files")
-async def get_knowledge_files(category_id: int = None, user: dict = Depends(get_current_user)):
+async def get_knowledge_files(category_id: int = None, user: dict = Depends(get_current_admin)):
     try:
         if category_id is None:
             categories = qa_system.mysql_client.get_all_categories()
@@ -99,7 +100,7 @@ async def get_knowledge_files(category_id: int = None, user: dict = Depends(get_
 
 
 @router.post("/knowledge/categories")
-async def create_category(request: CreateCategoryRequest, user: dict = Depends(get_current_user)):
+async def create_category(request: CreateCategoryRequest, user: dict = Depends(get_current_admin)):
     try:
         category_name = request.category_name.strip()
         if not category_name:
@@ -119,7 +120,7 @@ async def create_category(request: CreateCategoryRequest, user: dict = Depends(g
 
 
 @router.get("/knowledge/categories")
-async def get_categories(user: dict = Depends(get_current_user)):
+async def get_categories(user: dict = Depends(get_current_admin)):
     try:
         categories = qa_system.mysql_client.get_all_categories()
         return {"categories": categories}
@@ -129,7 +130,7 @@ async def get_categories(user: dict = Depends(get_current_user)):
 
 
 @router.delete("/knowledge/categories/{category_id}")
-async def delete_category(category_id: int, user: dict = Depends(get_current_user)):
+async def delete_category(category_id: int, user: dict = Depends(get_current_admin)):
     try:
         success = qa_system.mysql_client.delete_category(category_id)
         if success:
@@ -143,7 +144,7 @@ async def delete_category(category_id: int, user: dict = Depends(get_current_use
 
 
 @router.get("/knowledge/categories/{category_id}/files")
-async def get_category_files(category_id: int, user: dict = Depends(get_current_user)):
+async def get_category_files(category_id: int, user: dict = Depends(get_current_admin)):
     try:
         files = qa_system.mysql_client.get_files_by_category(category_id)
         result_files = []
@@ -169,7 +170,7 @@ async def get_category_files(category_id: int, user: dict = Depends(get_current_
 
 
 @router.get("/knowledge/files/{file_id}")
-async def get_file_info(file_id: int, user: dict = Depends(get_current_user)):
+async def get_file_info(file_id: int, user: dict = Depends(get_current_admin)):
     try:
         file_info = qa_system.mysql_client.get_file_by_id(file_id)
         if not file_info:
@@ -195,7 +196,7 @@ async def get_file_info(file_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.get("/knowledge/files/{file_id}/preview")
-async def preview_file(file_id: int, user: dict = Depends(get_current_user)):
+async def preview_file(file_id: int, user: dict = Depends(get_current_admin)):
     try:
         file_info = qa_system.mysql_client.get_file_by_id(file_id)
         if not file_info:
@@ -271,7 +272,7 @@ async def preview_file(file_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.get("/knowledge/preview")
-async def preview_file_by_path(path: str, user: dict = Depends(get_current_user)):
+async def preview_file_by_path(path: str, user: dict = Depends(get_current_admin)):
     try:
         file_path = os.path.join(DATA_BASE_PATH, path)
 
@@ -418,7 +419,7 @@ async def preview_file_by_path(path: str, user: dict = Depends(get_current_user)
 
 
 @router.post("/knowledge/search")
-async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_current_user)):
+async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_current_admin)):
     try:
         if not request.query or not request.query.strip():
             raise HTTPException(status_code=400, detail="查询内容不能为空")
@@ -461,7 +462,7 @@ async def vector_search(request: VectorSearchRequest, user: dict = Depends(get_c
 
 
 @router.post("/knowledge/vector/detail")
-async def get_vector_detail(request: VectorIdRequest, user: dict = Depends(get_current_user)):
+async def get_vector_detail(request: VectorIdRequest, user: dict = Depends(get_current_admin)):
     try:
         if not request.vector_id or not request.vector_id.strip():
             raise HTTPException(status_code=400, detail="向量ID不能为空")
@@ -482,7 +483,7 @@ async def get_vector_detail(request: VectorIdRequest, user: dict = Depends(get_c
 
 
 @router.get("/knowledge/sources")
-async def get_knowledge_sources(user: dict = Depends(get_current_user)):
+async def get_knowledge_sources(user: dict = Depends(get_current_admin)):
     try:
         sources = qa_system.mysql_client.get_all_categories()
         source_list = [{"id": cat["id"], "name": cat["category"]} for cat in sources]
@@ -496,7 +497,7 @@ async def get_knowledge_sources(user: dict = Depends(get_current_user)):
 async def upload_file(
     category_id: int,
     file: UploadFile = File(...),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_admin),
 ):
     try:
         category = qa_system.mysql_client.get_category_by_id(category_id)
@@ -532,7 +533,7 @@ async def upload_file(
 
 
 @router.delete("/knowledge/files/{file_id}")
-async def delete_file(file_id: int, user: dict = Depends(get_current_user)):
+async def delete_file(file_id: int, user: dict = Depends(get_current_admin)):
     try:
         success = qa_system.mysql_client.delete_file(file_id)
         if success:
@@ -546,7 +547,7 @@ async def delete_file(file_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.post("/knowledge/chunk")
-async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_user)):
+async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_admin)):
     from rag_qa.core.document_process import process_single_file
 
     def collect_files_from_folder(folder_id, collected_files):
@@ -644,7 +645,7 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_us
 
 
 @router.get("/knowledge/files/unchunked")
-async def get_unchunked_files(category_id: Optional[int] = None, user: dict = Depends(get_current_user)):
+async def get_unchunked_files(category_id: Optional[int] = None, user: dict = Depends(get_current_admin)):
     try:
         if category_id:
             all_files = qa_system.mysql_client.get_files_by_category(category_id)
@@ -662,7 +663,7 @@ async def get_unchunked_files(category_id: Optional[int] = None, user: dict = De
 
 
 @router.get("/knowledge/files/{file_id}/chunks")
-async def get_file_chunks(file_id: int, user: dict = Depends(get_current_user)):
+async def get_file_chunks(file_id: int, user: dict = Depends(get_current_admin)):
     try:
         file_info = qa_system.mysql_client.get_file_by_id(file_id)
         if not file_info:
@@ -695,7 +696,7 @@ async def get_file_chunks(file_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.get("/knowledge/supported-types")
-async def get_supported_file_types():
+async def get_supported_file_types(user: dict = Depends(get_current_admin)):
     from rag_qa.core.document_process import SUPPORTED_EXTENSIONS
 
     return {

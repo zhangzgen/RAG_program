@@ -48,6 +48,7 @@ class MysqlClient(object):
                 CREATE TABLE IF NOT EXISTS user (
                     id INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户ID，主键',
                     email VARCHAR(255) NOT NULL COMMENT '用户邮箱',
+                    is_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否是管理员：0-否，1-是',
                     create_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                     PRIMARY KEY (id),
                     UNIQUE INDEX idx_email (email)
@@ -86,6 +87,16 @@ class MysqlClient(object):
             
             self.connect.commit()
             logger.info('用户表、会话表和对话记录表创建成功')
+
+            # 检查并添加 is_admin 字段
+            self.cursor.execute("SHOW COLUMNS FROM user LIKE 'is_admin'")
+            admin_result = self.cursor.fetchone()
+            if not admin_result:
+                self.cursor.execute(
+                    'ALTER TABLE user ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT "是否是管理员：0-否，1-是" AFTER email'
+                )
+                self.connect.commit()
+                logger.info('user表添加is_admin字段成功')
             
             # 检查并添加/修改 trace_data 字段
             self.cursor.execute("SHOW COLUMNS FROM conversations LIKE 'trace_data'")
@@ -202,7 +213,7 @@ class MysqlClient(object):
         """
         try:
             # 查询用户是否存在
-            self.cursor.execute('SELECT id FROM user WHERE email = %s', (email,))
+            self.cursor.execute('SELECT id, is_admin FROM user WHERE email = %s', (email,))
             user = self.cursor.fetchone()
             
             if user:
@@ -231,18 +242,45 @@ class MysqlClient(object):
             dict: 用户信息字典，包含id和email
         """
         try:
-            self.cursor.execute('SELECT id, email, create_at FROM user WHERE email = %s', (email,))
+            self.cursor.execute('SELECT id, email, is_admin, create_at FROM user WHERE email = %s', (email,))
             user = self.cursor.fetchone()
             
             if user:
                 return {
                     'id': user[0],
                     'email': user[1],
-                    'create_at': user[2]
+                    'is_admin': int(user[2] or 0),
+                    'create_at': user[3]
                 }
             return None
         except Exception as e:
             logger.error(f'获取用户信息失败: {e}')
+            return None
+
+    def get_user_by_id(self, user_id):
+        """
+        根据ID获取用户信息
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            dict: 用户信息字典，包含id、email、is_admin和create_at
+        """
+        try:
+            self.cursor.execute('SELECT id, email, is_admin, create_at FROM user WHERE id = %s', (user_id,))
+            user = self.cursor.fetchone()
+
+            if user:
+                return {
+                    'id': user[0],
+                    'email': user[1],
+                    'is_admin': int(user[2] or 0),
+                    'create_at': user[3],
+                }
+            return None
+        except Exception as e:
+            logger.error(f'根据ID获取用户信息失败: {e}')
             return None
 
     # ==================== 会话相关操作 ====================

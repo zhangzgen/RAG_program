@@ -9,6 +9,7 @@ from .shared import (
     SessionDetail,
     SessionInfo,
     UpdateStatusRequest,
+    get_current_admin,
     get_current_user,
     qa_system,
 )
@@ -102,7 +103,7 @@ async def delete_session(session_id: str, user: dict = Depends(get_current_user)
 async def update_conversation_status(
     conversation_id: int,
     request: UpdateStatusRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_admin),
 ):
     try:
         if request.status not in [0, 1, 2]:

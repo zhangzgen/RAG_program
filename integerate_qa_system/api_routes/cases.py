@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
-from .shared import CaseDetail, CaseListResponse, get_current_user, qa_system
+from .shared import CaseDetail, CaseListResponse, get_current_admin, qa_system
 
 
 router = APIRouter()
@@ -14,7 +14,7 @@ async def get_cases(
     status: int = 1,
     page: int = 1,
     page_size: int = 20,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_admin),
 ):
     try:
         if status not in [1, 2]:
@@ -38,7 +38,7 @@ async def get_cases(
 
 
 @router.get("/cases/download")
-async def download_cases(status: int = 1, user: dict = Depends(get_current_user)):
+async def download_cases(status: int = 1, user: dict = Depends(get_current_admin)):
     if status not in [1, 2]:
         raise HTTPException(status_code=400, detail="状态值必须为1(GoodCase)或2(BadCase)")
 
@@ -58,7 +58,7 @@ async def download_cases(status: int = 1, user: dict = Depends(get_current_user)
 
 
 @router.get("/cases/{conversation_id}")
-async def get_case_detail(conversation_id: int, user: dict = Depends(get_current_user)):
+async def get_case_detail(conversation_id: int, user: dict = Depends(get_current_admin)):
     try:
         case = qa_system.mysql_client.get_conversation_by_id(conversation_id)
         if not case:

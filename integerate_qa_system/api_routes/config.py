@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from base import Config
 
-from .shared import ConfigUpdateRequest, auth_service, compare_configs, email_service, get_current_user, parse_config_content, qa_system
+from .shared import ConfigUpdateRequest, auth_service, compare_configs, email_service, get_current_admin, parse_config_content, qa_system
 
 
 router = APIRouter()
@@ -29,7 +29,7 @@ def _apply_runtime_reload(changed_items):
 
 
 @router.get("/config")
-async def get_config(user: dict = Depends(get_current_user)):
+async def get_config(user: dict = Depends(get_current_admin)):
     try:
         Config._config_cache = None
         config = Config()
@@ -103,7 +103,7 @@ async def get_config(user: dict = Depends(get_current_user)):
 
 
 @router.get("/config/raw")
-async def get_raw_config(user: dict = Depends(get_current_user)):
+async def get_raw_config(user: dict = Depends(get_current_admin)):
     try:
         config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.ini")
         with open(config_path, "r", encoding="utf-8") as f:
@@ -118,7 +118,7 @@ async def get_raw_config(user: dict = Depends(get_current_user)):
 
 
 @router.post("/config")
-async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_current_user)):
+async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_current_admin)):
     try:
         config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.ini")
 
@@ -179,7 +179,7 @@ async def update_config(request: ConfigUpdateRequest, user: dict = Depends(get_c
 
 
 @router.get("/config/versions")
-async def get_config_versions(limit: int = 20, user: dict = Depends(get_current_user)):
+async def get_config_versions(limit: int = 20, user: dict = Depends(get_current_admin)):
     try:
         versions = qa_system.mysql_client.get_config_versions(limit)
         return {
@@ -193,7 +193,7 @@ async def get_config_versions(limit: int = 20, user: dict = Depends(get_current_
 
 
 @router.get("/config/versions/{version_id}")
-async def get_config_version_detail(version_id: int, user: dict = Depends(get_current_user)):
+async def get_config_version_detail(version_id: int, user: dict = Depends(get_current_admin)):
     try:
         version = qa_system.mysql_client.get_config_by_id(version_id)
         if not version:
@@ -210,7 +210,7 @@ async def get_config_version_detail(version_id: int, user: dict = Depends(get_cu
 
 
 @router.post("/config/rollback/{version_id}")
-async def rollback_config(version_id: int, user: dict = Depends(get_current_user)):
+async def rollback_config(version_id: int, user: dict = Depends(get_current_admin)):
     try:
         version = qa_system.mysql_client.get_config_by_id(version_id)
         if not version:
