@@ -4,9 +4,16 @@ import json
 import pymysql
 import pandas as pd
 
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+project_root = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.insert(0, project_root)
 from base import Config, logger
+
+
+def resolve_project_path(path):
+    """Resolve database paths saved relative to integerate_qa_system."""
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    return os.path.normpath(os.path.join(project_root, path))
 
 
 class MysqlClient(object):
@@ -54,7 +61,7 @@ class MysqlClient(object):
                     UNIQUE INDEX idx_email (email)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表'
             ''')
-            
+
             # 创建user_session表
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS user_session (
@@ -68,7 +75,7 @@ class MysqlClient(object):
                     CONSTRAINT fk_user_session_user_id FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户会话表'
             ''')
-            
+
             # 创建conversations表
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -84,7 +91,7 @@ class MysqlClient(object):
                     CONSTRAINT fk_conversations_session_id FOREIGN KEY (session_id) REFERENCES user_session (session_id) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='对话记录表'
             ''')
-            
+
             self.connect.commit()
             logger.info('用户表、会话表和对话记录表创建成功')
 
@@ -97,7 +104,7 @@ class MysqlClient(object):
                 )
                 self.connect.commit()
                 logger.info('user表添加is_admin字段成功')
-            
+
             # 检查并添加/修改 trace_data 字段
             self.cursor.execute("SHOW COLUMNS FROM conversations LIKE 'trace_data'")
             result = self.cursor.fetchone()
@@ -113,7 +120,7 @@ class MysqlClient(object):
                     self.cursor.execute('ALTER TABLE conversations MODIFY COLUMN trace_data TEXT NULL COMMENT "系统执行链路JSON数据"')
                     self.connect.commit()
                     logger.info('conversations表trace_data字段类型已修改为TEXT')
-            
+
             # 检查并添加 status 字段
             self.cursor.execute("SHOW COLUMNS FROM conversations LIKE 'status'")
             status_result = self.cursor.fetchone()
@@ -136,7 +143,7 @@ class MysqlClient(object):
                     UNIQUE KEY uk_category (category)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件分类表'
             ''')
-            
+
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS file_info (
                     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
@@ -148,7 +155,7 @@ class MysqlClient(object):
                     FOREIGN KEY (category_id) REFERENCES category(id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件记录表'
             ''')
-            
+
             self.connect.commit()
             logger.info('知识库相关表创建成功')
         except pymysql.MySQLError as e:
@@ -200,14 +207,14 @@ class MysqlClient(object):
             return None
 
     # ==================== 用户相关操作 ====================
-    
+
     def get_or_create_user(self, email):
         """
         根据邮箱获取或创建用户
-        
+
         Args:
             email: 用户邮箱
-            
+
         Returns:
             int: 用户ID
         """
@@ -215,7 +222,7 @@ class MysqlClient(object):
             # 查询用户是否存在
             self.cursor.execute('SELECT id, is_admin FROM user WHERE email = %s', (email,))
             user = self.cursor.fetchone()
-            
+
             if user:
                 logger.info(f'用户已存在: {email}')
                 return user[0]
@@ -234,17 +241,17 @@ class MysqlClient(object):
     def get_user_by_email(self, email):
         """
         根据邮箱获取用户信息
-        
+
         Args:
             email: 用户邮箱
-            
+
         Returns:
             dict: 用户信息字典，包含id和email
         """
         try:
             self.cursor.execute('SELECT id, email, is_admin, create_at FROM user WHERE email = %s', (email,))
             user = self.cursor.fetchone()
-            
+
             if user:
                 return {
                     'id': user[0],
@@ -284,15 +291,15 @@ class MysqlClient(object):
             return None
 
     # ==================== 会话相关操作 ====================
-    
+
     def create_user_session(self, user_id, session_id):
         """
         创建用户会话
-        
+
         Args:
             user_id: 用户ID
             session_id: 会话ID
-            
+
         Returns:
             bool: 创建成功返回True
         """
@@ -312,11 +319,11 @@ class MysqlClient(object):
     def get_user_sessions(self, user_id, limit=20):
         """
         获取用户的所有会话（只返回status=1的会话）
-        
+
         Args:
             user_id: 用户ID
             limit: 返回数量限制
-            
+
         Returns:
             list: 会话列表
         """
@@ -381,15 +388,15 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'获取指定对话之前历史失败: {e}')
             return []
-    
+
     def soft_delete_session(self, session_id, user_id):
         """
         软删除会话（将status设为0）
-        
+
         Args:
             session_id: 会话ID
             user_id: 用户ID
-            
+
         Returns:
             bool: 删除成功返回True
         """
@@ -414,11 +421,11 @@ class MysqlClient(object):
     def verify_session_owner(self, session_id, user_id):
         """
         验证会话是否属于指定用户（只验证status=1的会话）
-        
+
         Args:
             session_id: 会话ID
             user_id: 用户ID
-            
+
         Returns:
             bool: 属于返回True，否则返回False
         """
@@ -434,7 +441,7 @@ class MysqlClient(object):
             return False
 
     # ==================== 对话记录相关操作 ====================
-    
+
     def save_conversation(self, session_id, query, answer):
         try:
             insert_query = """INSERT INTO conversations (session_id, query, answer) VALUES (%s, %s, %s)"""
@@ -457,21 +464,21 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'会话查询失败: {e}')
             return []
-    
+
     def get_conversation_by_id(self, conversation_id):
         """
         根据ID获取对话详情
-        
+
         Args:
             conversation_id: 对话ID
-            
+
         Returns:
             dict: 对话详情
         """
         try:
             self.cursor.execute('''
                 SELECT id, session_id, query, answer, trace_data, status, created_at
-                FROM conversations 
+                FROM conversations
                 WHERE id = %s
             ''', (conversation_id,))
             result = self.cursor.fetchone()
@@ -489,22 +496,22 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'获取对话详情失败: {e}')
             return None
-    
+
     def update_conversation_status(self, conversation_id, status):
         """
         更新对话状态
-        
+
         Args:
             conversation_id: 对话ID
             status: 状态值 (0-默认, 1-GoodCase, 2-BadCase)
-            
+
         Returns:
             bool: 更新成功返回True
         """
         try:
             self.cursor.execute('''
-                UPDATE conversations 
-                SET status = %s 
+                UPDATE conversations
+                SET status = %s
                 WHERE id = %s
             ''', (status, conversation_id))
             self.connect.commit()
@@ -573,23 +580,23 @@ class MysqlClient(object):
             logger.error(f'更新对话内容失败: {e}')
             self.connect.rollback()
             return False
-    
+
     def get_conversations_by_status(self, status, limit=50, offset=0):
         """
         根据状态获取对话列表
-        
+
         Args:
             status: 状态值 (1-GoodCase, 2-BadCase)
             limit: 返回数量限制
             offset: 偏移量
-            
+
         Returns:
             list: 对话列表
         """
         try:
             self.cursor.execute('''
                 SELECT id, session_id, query, answer, trace_data, status, created_at
-                FROM conversations 
+                FROM conversations
                 WHERE status = %s
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
@@ -607,14 +614,14 @@ class MysqlClient(object):
         except Exception as e:
             logger.error(f'根据状态获取对话列表失败: {e}')
             return []
-    
+
     def get_conversations_count_by_status(self, status):
         """
         获取指定状态的对话数量
-        
+
         Args:
             status: 状态值
-            
+
         Returns:
             int: 数量
         """
@@ -647,31 +654,31 @@ class MysqlClient(object):
     def create_category(self, category_name, base_path):
         """
         创建分类，同时在文件系统中创建对应文件夹
-        
+
         Args:
             category_name: 分类名称
             base_path: 基础路径
-            
+
         Returns:
             dict: 包含category_id和folder_path的字典
         """
         try:
             folder_path = os.path.join(base_path, category_name)
-            os.makedirs(folder_path, exist_ok=True)
-            
+            os.makedirs(resolve_project_path(folder_path), exist_ok=True)
+
             self.cursor.execute(
                 'INSERT INTO category (category) VALUES (%s)',
                 (category_name,)
             )
             self.connect.commit()
             category_id = self.cursor.lastrowid
-            
+
             self.cursor.execute(
                 'INSERT INTO file_info (file_path, is_dir, category_id) VALUES (%s, %s, %s)',
                 (folder_path, 1, category_id)
             )
             self.connect.commit()
-            
+
             logger.info(f'分类创建成功: {category_name}, path={folder_path}')
             return {
                 'category_id': category_id,
@@ -689,7 +696,7 @@ class MysqlClient(object):
     def get_all_categories(self):
         """
         获取所有分类
-        
+
         Returns:
             list: 分类列表
         """
@@ -704,10 +711,10 @@ class MysqlClient(object):
     def get_category_by_id(self, category_id):
         """
         根据ID获取分类信息
-        
+
         Args:
             category_id: 分类ID
-            
+
         Returns:
             dict: 分类信息
         """
@@ -724,10 +731,10 @@ class MysqlClient(object):
     def get_files_by_category(self, category_id):
         """
         获取指定分类下的所有文件和文件夹（排除分类文件夹本身）
-        
+
         Args:
             category_id: 分类ID
-            
+
         Returns:
             list: 文件列表
         """
@@ -735,15 +742,15 @@ class MysqlClient(object):
             category = self.get_category_by_id(category_id)
             if not category:
                 return []
-            
+
             self.cursor.execute('''
-                SELECT id, file_path, is_dir, is_chunk, category_id 
-                FROM file_info 
-                WHERE category_id = %s 
+                SELECT id, file_path, is_dir, is_chunk, category_id
+                FROM file_info
+                WHERE category_id = %s
                 ORDER BY is_dir DESC, file_path ASC
             ''', (category_id,))
             files = self.cursor.fetchall()
-            
+
             category_folder_path = None
             for f in files:
                 if f[2] == 1:
@@ -751,7 +758,7 @@ class MysqlClient(object):
                     if file_name == category['category']:
                         category_folder_path = f[1]
                         break
-            
+
             result = []
             for f in files:
                 if category_folder_path and f[1] == category_folder_path:
@@ -763,7 +770,7 @@ class MysqlClient(object):
                     'is_chunk': bool(f[3]),
                     'category_id': f[4]
                 })
-            
+
             return result
         except Exception as e:
             logger.error(f'获取文件列表失败: {e}')
@@ -772,14 +779,14 @@ class MysqlClient(object):
     def get_all_files(self):
         """
         获取所有文件
-        
+
         Returns:
             list: 文件列表
         """
         try:
             self.cursor.execute('''
-                SELECT id, file_path, is_dir, is_chunk, category_id 
-                FROM file_info 
+                SELECT id, file_path, is_dir, is_chunk, category_id
+                FROM file_info
                 ORDER BY category_id, is_dir DESC, file_path ASC
             ''')
             files = self.cursor.fetchall()
@@ -797,17 +804,17 @@ class MysqlClient(object):
     def get_file_by_id(self, file_id):
         """
         根据ID获取文件信息
-        
+
         Args:
             file_id: 文件ID
-            
+
         Returns:
             dict: 文件信息
         """
         try:
             self.cursor.execute('''
-                SELECT id, file_path, is_dir, is_chunk, category_id 
-                FROM file_info 
+                SELECT id, file_path, is_dir, is_chunk, category_id
+                FROM file_info
                 WHERE id = %s
             ''', (file_id,))
             f = self.cursor.fetchone()
@@ -827,10 +834,10 @@ class MysqlClient(object):
     def get_files_by_parent_folder(self, folder_id):
         """
         获取文件夹下的所有文件（通过路径前缀匹配）
-        
+
         Args:
             folder_id: 文件夹ID
-            
+
         Returns:
             list: 文件列表
         """
@@ -838,12 +845,12 @@ class MysqlClient(object):
             folder = self.get_file_by_id(folder_id)
             if not folder or not folder['is_dir']:
                 return []
-            
+
             folder_path = folder['file_path']
-            
+
             self.cursor.execute('''
-                SELECT id, file_path, is_dir, is_chunk, category_id 
-                FROM file_info 
+                SELECT id, file_path, is_dir, is_chunk, category_id
+                FROM file_info
                 WHERE file_path LIKE %s AND id != %s
                 ORDER BY is_dir DESC, file_path ASC
             ''', (folder_path + '/%', folder_id))
@@ -862,19 +869,19 @@ class MysqlClient(object):
     def add_file(self, file_path, is_dir, category_id, is_chunk=False):
         """
         添加文件记录
-        
+
         Args:
             file_path: 文件路径
             is_dir: 是否为文件夹
             category_id: 分类ID
             is_chunk: 是否已切片
-            
+
         Returns:
             int: 文件ID
         """
         try:
             self.cursor.execute('''
-                INSERT INTO file_info (file_path, is_dir, is_chunk, category_id) 
+                INSERT INTO file_info (file_path, is_dir, is_chunk, category_id)
                 VALUES (%s, %s, %s, %s)
             ''', (file_path, 1 if is_dir else 0, 1 if is_chunk else 0, category_id))
             self.connect.commit()
@@ -889,11 +896,11 @@ class MysqlClient(object):
     def update_file_chunk_status(self, file_id, is_chunk):
         """
         更新文件的切片状态
-        
+
         Args:
             file_id: 文件ID
             is_chunk: 是否已切片
-            
+
         Returns:
             bool: 更新成功返回True
         """
@@ -912,31 +919,32 @@ class MysqlClient(object):
     def delete_file(self, file_id):
         """
         删除文件记录
-        
+
         Args:
             file_id: 文件ID
-            
+
         Returns:
             bool: 删除成功返回True
         """
         try:
             self.cursor.execute('SELECT file_path, is_dir FROM file_info WHERE id = %s', (file_id,))
             file_info = self.cursor.fetchone()
-            
+
             if not file_info:
                 logger.warning(f'文件不存在: file_id={file_id}')
                 return False
-            
+
             file_path = file_info[0]
             is_dir = file_info[1]
-            
-            if os.path.exists(file_path):
+
+            file_fs_path = resolve_project_path(file_path)
+            if os.path.exists(file_fs_path):
                 if is_dir:
                     import shutil
-                    shutil.rmtree(file_path)
+                    shutil.rmtree(file_fs_path)
                 else:
-                    os.remove(file_path)
-            
+                    os.remove(file_fs_path)
+
             self.cursor.execute('DELETE FROM file_info WHERE id = %s', (file_id,))
             self.connect.commit()
             logger.info(f'文件删除成功: {file_path}')
@@ -949,32 +957,33 @@ class MysqlClient(object):
     def delete_category(self, category_id):
         """
         删除分类及其所有文件
-        
+
         Args:
             category_id: 分类ID
-            
+
         Returns:
             bool: 删除成功返回True
         """
         try:
             self.cursor.execute('SELECT category FROM category WHERE id = %s', (category_id,))
             cat = self.cursor.fetchone()
-            
+
             if not cat:
                 logger.warning(f'分类不存在: category_id={category_id}')
                 return False
-            
+
             self.cursor.execute('SELECT file_path FROM file_info WHERE category_id = %s', (category_id,))
             files = self.cursor.fetchall()
-            
+
             import shutil
             for file_path in files:
-                if os.path.exists(file_path[0]):
-                    if os.path.isdir(file_path[0]):
-                        shutil.rmtree(file_path[0])
+                file_fs_path = resolve_project_path(file_path[0])
+                if os.path.exists(file_fs_path):
+                    if os.path.isdir(file_fs_path):
+                        shutil.rmtree(file_fs_path)
                     else:
-                        os.remove(file_path[0])
-            
+                        os.remove(file_fs_path)
+
             self.cursor.execute('DELETE FROM file_info WHERE category_id = %s', (category_id,))
             self.cursor.execute('DELETE FROM category WHERE id = %s', (category_id,))
             self.connect.commit()
@@ -1065,16 +1074,16 @@ class MysqlClient(object):
     def get_current_config(self):
         """
         获取当前配置内容
-        
+
         Returns:
             dict: 当前配置内容
         """
         try:
             self.cursor.execute('''
-                SELECT id, version, config_content, created_at 
-                FROM config_version 
-                WHERE is_active = 1 
-                ORDER BY created_at DESC 
+                SELECT id, version, config_content, created_at
+                FROM config_version
+                WHERE is_active = 1
+                ORDER BY created_at DESC
                 LIMIT 1
             ''')
             result = self.cursor.fetchone()
@@ -1093,18 +1102,18 @@ class MysqlClient(object):
     def get_config_versions(self, limit=20):
         """
         获取配置版本列表
-        
+
         Args:
             limit: 返回数量限制
-            
+
         Returns:
             list: 版本列表
         """
         try:
             self.cursor.execute('''
                 SELECT id, version, change_description, changed_by, created_at, is_active
-                FROM config_version 
-                ORDER BY created_at DESC 
+                FROM config_version
+                ORDER BY created_at DESC
                 LIMIT %s
             ''', (limit,))
             results = self.cursor.fetchall()
@@ -1123,19 +1132,19 @@ class MysqlClient(object):
     def save_config_version(self, version, config_content, change_description='', changed_by='system'):
         """
         保存新的配置版本
-        
+
         Args:
             version: 版本号
             config_content: 配置内容(JSON字符串)
             change_description: 变更描述
             changed_by: 变更人
-            
+
         Returns:
             int: 新版本ID
         """
         try:
             self.cursor.execute('UPDATE config_version SET is_active = 0')
-            
+
             self.cursor.execute('''
                 INSERT INTO config_version (version, config_content, change_description, changed_by, is_active)
                 VALUES (%s, %s, %s, %s, 1)
@@ -1152,32 +1161,32 @@ class MysqlClient(object):
     def rollback_config(self, version_id):
         """
         回退到指定配置版本（不创建新版本）
-        
+
         Args:
             version_id: 目标版本ID
-            
+
         Returns:
             dict: 回退后的配置内容
         """
         try:
             self.cursor.execute('''
                 SELECT id, version, config_content, change_description
-                FROM config_version 
+                FROM config_version
                 WHERE id = %s
             ''', (version_id,))
             result = self.cursor.fetchone()
-            
+
             if not result:
                 logger.warning(f'配置版本不存在: version_id={version_id}')
                 return None
-            
+
             old_version = result[1]
             config_content = result[2]
-            
+
             self.cursor.execute('UPDATE config_version SET is_active = 0')
             self.cursor.execute('UPDATE config_version SET is_active = 1 WHERE id = %s', (version_id,))
             self.connect.commit()
-            
+
             logger.info(f'配置回退成功: 回退到版本 {old_version}')
             return {
                 'id': result[0],
@@ -1419,15 +1428,15 @@ class MysqlClient(object):
             if search_keyword:
                 search_pattern = f'%{search_keyword}%'
                 self.cursor.execute('''
-                    SELECT id, subject_name, question, answer 
-                    FROM jpkb 
+                    SELECT id, subject_name, question, answer
+                    FROM jpkb
                     WHERE subject_name LIKE %s OR question LIKE %s
                     ORDER BY id DESC
                 ''', (search_pattern, search_pattern))
             else:
                 self.cursor.execute('''
-                    SELECT id, subject_name, question, answer 
-                    FROM jpkb 
+                    SELECT id, subject_name, question, answer
+                    FROM jpkb
                     ORDER BY id DESC
                 ''')
             results = self.cursor.fetchall()
@@ -1445,8 +1454,8 @@ class MysqlClient(object):
         """根据ID获取FAQ"""
         try:
             self.cursor.execute('''
-                SELECT id, subject_name, question, answer 
-                FROM jpkb 
+                SELECT id, subject_name, question, answer
+                FROM jpkb
                 WHERE id = %s
             ''', (faq_id,))
             result = self.cursor.fetchone()
@@ -1466,7 +1475,7 @@ class MysqlClient(object):
         """添加FAQ"""
         try:
             self.cursor.execute('''
-                INSERT INTO jpkb (subject_name, question, answer) 
+                INSERT INTO jpkb (subject_name, question, answer)
                 VALUES (%s, %s, %s)
             ''', (subject_name, question, answer))
             self.connect.commit()
@@ -1480,8 +1489,8 @@ class MysqlClient(object):
         """更新FAQ"""
         try:
             self.cursor.execute('''
-                UPDATE jpkb 
-                SET subject_name = %s, question = %s, answer = %s 
+                UPDATE jpkb
+                SET subject_name = %s, question = %s, answer = %s
                 WHERE id = %s
             ''', (subject_name, question, answer, faq_id))
             self.connect.commit()

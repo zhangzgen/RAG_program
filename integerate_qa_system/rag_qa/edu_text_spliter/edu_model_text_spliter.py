@@ -1,4 +1,5 @@
 from langchain.text_splitter import CharacterTextSplitter
+import os
 import re
 from typing import List
 from modelscope.pipelines import pipeline
@@ -19,7 +20,8 @@ class AliTextSplitter(CharacterTextSplitter):
             text = re.sub("\n\n", "", text)
         p = pipeline(
             task="document-segmentation",
-            model=r'D:\Document\PythonProjects\Edu_RAG_QA\integerate_qa_system\rag_qa\nlp_bert_document-segmentation_chinese-base',
+            model=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "nlp_bert_document-segmentation_chinese-base"),
             device="cpu")
         result = p(documents=text)
         sent_list = [i for i in result["text"].split("\n\t") if i]

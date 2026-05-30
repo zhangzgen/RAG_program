@@ -32,7 +32,7 @@ function App() {
   const [sessionData, setSessionData] = useState(null);
   const chatAreaRef = useRef(null);
   const sidebarRef = useRef(null);
-  
+
   const [mode, setMode] = useState('qa');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [professionalTab, setProfessionalTab] = useState('knowledge');
@@ -71,12 +71,12 @@ function App() {
     if (savedCollapsed !== null) {
       setIsSidebarCollapsed(JSON.parse(savedCollapsed));
     }
-    
+
     const savedHidden = localStorage.getItem('sidebarHidden');
     if (savedHidden !== null) {
       setIsSidebarHidden(JSON.parse(savedHidden));
     }
-    
+
   }, []);
 
   useEffect(() => {
@@ -228,7 +228,7 @@ function App() {
         professionalTab={professionalTab}
         onProfessionalTabChange={handleProfessionalTabChange}
       />
-      
+
       <div className="main-modern-area">
         {currentMode === 'qa' ? (
           <ChatAreaModern

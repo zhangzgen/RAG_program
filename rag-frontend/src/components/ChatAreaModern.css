@@ -484,7 +484,7 @@
   .input-form-modern {
     max-width: 640px;
   }
-  
+
   .input-container-modern.input-centered {
     max-width: 800px;
   }
@@ -555,12 +555,12 @@
     font-size: 7.5px;
     min-height: 20px;
   }
-  
+
   .action-btn-modern {
     width: 18px;
     height: 18px;
   }
-  
+
   .send-btn-modern {
     width: 22px;
     height: 22px;
@@ -929,35 +929,35 @@
     width: 2px;
     height: 2px;
   }
-  
+
   .markdown-content h1 {
     font-size: 7px;
   }
-  
+
   .markdown-content h2 {
     font-size: 6px;
   }
-  
+
   .markdown-content h3 {
     font-size: 5.5px;
   }
-  
+
   .markdown-content h4,
   .markdown-content h5,
   .markdown-content h6 {
     font-size: 5px;
   }
-  
+
   .markdown-content code {
     font-size: 4.5px;
     padding: 1px 2px;
   }
-  
+
   .markdown-content pre {
     font-size: 4.5px;
     padding: 2px 4px;
   }
-  
+
   .markdown-content table {
     font-size: 4.5px;
   }

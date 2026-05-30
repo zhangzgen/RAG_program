@@ -212,7 +212,7 @@ class VectorStore:
         )[0]
 
         sub_chunks = [self._doc_from_hit(hit["entity"]) for hit in results]
-        
+
         unique_results = []
         seen_parent_ids = set()
         for chunk in sub_chunks:
@@ -220,12 +220,12 @@ class VectorStore:
             if parent_id and parent_id not in seen_parent_ids:
                 unique_results.append(chunk)
                 seen_parent_ids.add(parent_id)
-        
+
         if len(unique_results) < 2:
             for i, doc in enumerate(unique_results[:conf.CANDIDATE_M]):
                 doc.metadata['rerank_score'] = 1.0 if i == 0 else 0.5
             return unique_results[:conf.CANDIDATE_M]
-        
+
         if unique_results:
             pairs = [[query, doc.page_content] for doc in unique_results]
             scores = self.reranker.predict(pairs)
@@ -240,11 +240,11 @@ class VectorStore:
     def get_chunks_by_file_path(self, file_path, limit=100):
         """
         根据文件路径查询该文件的所有切片
-        
+
         Args:
             file_path: 文件路径
             limit: 返回的最大切片数量
-            
+
         Returns:
             list: 切片列表，每个切片包含 text, parent_content, parent_id 等信息
         """
@@ -257,7 +257,7 @@ class VectorStore:
                 output_fields=["text", "parent_id", "parent_content", "source", "timestamp", "file_path"],
                 limit=limit
             )
-            
+
             chunks = []
             for hit in results:
                 chunks.append({
@@ -268,7 +268,7 @@ class VectorStore:
                     'timestamp': hit.get('timestamp', ''),
                     'file_path': hit.get('file_path', ''),
                 })
-            
+
             self.logger.info(f'文件 {file_path} 查询到 {len(chunks)} 个切片')
             return chunks
         except Exception as e:
@@ -291,10 +291,10 @@ class VectorStore:
     def get_vector_by_id(self, vector_id):
         """
         根据向量ID查询单个向量
-        
+
         Args:
             vector_id: 向量ID
-            
+
         Returns:
             dict: 向量信息，包含 text, parent_content, source, file_path 等
         """
@@ -306,7 +306,7 @@ class VectorStore:
                 output_fields=["id", "text", "parent_id", "parent_content", "source", "timestamp", "file_path"],
                 limit=1
             )
-            
+
             if results:
                 hit = results[0]
                 return {

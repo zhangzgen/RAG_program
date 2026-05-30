@@ -516,93 +516,93 @@
     width: 100px;
     min-width: 100px;
   }
-  
+
   .sidebar-modern.collapsed {
     width: 36px;
     min-width: 36px;
   }
-  
+
   .sidebar-header-modern {
     padding: 6px 4px;
   }
-  
+
   .mode-btn-sidebar {
     padding: 4px 5px;
     font-size: 5px;
   }
-  
+
   .toggle-btn {
     width: 16px;
     height: 16px;
   }
-  
+
   .toggle-icon {
     width: 10px;
     height: 10px;
   }
-  
+
   .new-chat-section {
     padding: 4px;
   }
-  
+
   .new-chat-btn-modern {
     padding: 4px 6px;
     font-size: 5.5px;
   }
-  
+
   .session-item-modern {
     padding: 4px 5px;
     min-height: 24px;
   }
-  
+
   .session-icon-modern {
     width: 14px;
     height: 14px;
     font-size: 7px;
   }
-  
+
   .sidebar-modern.collapsed .session-icon-modern {
     width: 18px;
     height: 18px;
     font-size: 8px;
   }
-  
+
   .session-title-modern {
     font-size: 6px;
   }
-  
+
   .session-time-modern {
     font-size: 4.5px;
   }
-  
+
   .delete-btn-modern {
     width: 12px;
     height: 12px;
   }
-  
+
   .sidebar-footer-modern {
     padding: 4px;
   }
-  
+
   .user-section {
     padding: 4px;
     gap: 4px;
   }
-  
+
   .user-avatar {
     width: 18px;
     height: 18px;
     font-size: 7px;
   }
-  
+
   .user-name {
     font-size: 5.5px;
   }
-  
+
   .logout-btn {
     font-size: 5px;
   }
-  
+
   .logout-btn-collapsed {
     width: 22px;
     height: 22px;

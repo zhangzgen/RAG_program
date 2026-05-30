@@ -40,9 +40,9 @@ dataset = Dataset.from_dict(eval_data)
 
 # 3. 配置RAGAS评估环境
 # 初始化ChatOpenAI模型，指定使用gpt-4模型，并设置OpenAI API密钥
-# llm = ChatOpenAI(model="deepseek-chat", openai_api_key="sk-918f223151334727ba1253378dc90a23",base_url='https://api.deepseek.com',model_kwargs={"n": 3})
+# llm = ChatOpenAI(model="deepseek-chat", openai_api_key="your_api_key", base_url="https://api.deepseek.com", model_kwargs={"n": 3})
 # 初始化OpenAI嵌入模型，用于计算语义相似度，设置API密钥
-# embeddings = OpenAIEmbeddings(model="deepseek-embedding", openai_api_key="sk-918f223151334727ba1253378dc90a23",base_url='https://api.deepseek.com')
+# embeddings = OpenAIEmbeddings(model="deepseek-embedding", openai_api_key="your_api_key", base_url="https://api.deepseek.com")
 llm = ChatOllama(model='qwen2.5:7b', base_url='http://localhost:11434')
 embeddings = OllamaEmbeddings(model='mxbai-embed-large:latest', base_url='http://localhost:11434')
 # print(llm.client('你好'))

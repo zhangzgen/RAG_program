@@ -19,14 +19,57 @@ email_service = EmailService()
 redis_client = RedisClient()
 
 
-DATA_BASE_PATH = r"d:\WorkSpace\RAG_program\integerate_qa_system\data"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_BASE_RELATIVE_PATH = "data"
+DATA_BASE_PATH = os.path.join(PROJECT_ROOT, DATA_BASE_RELATIVE_PATH)
 ASSESSMENT_UPLOAD_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
+    PROJECT_ROOT,
     "rag_qa",
     "rag_accessment",
     "uploads",
 )
+os.makedirs(DATA_BASE_PATH, exist_ok=True)
 os.makedirs(ASSESSMENT_UPLOAD_DIR, exist_ok=True)
+
+
+def resolve_project_path(path: str) -> str:
+    """Resolve a project-relative path against the backend project root."""
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    return os.path.normpath(os.path.join(PROJECT_ROOT, path))
+
+
+def project_relative_path(path: str) -> str:
+    """Return a stable project-relative path for database/API storage."""
+    return os.path.relpath(resolve_project_path(path), PROJECT_ROOT).replace(os.sep, "/")
+
+
+def resolve_data_path(*parts: str) -> str:
+    """Resolve a path under the project data directory and prevent traversal."""
+    candidate = os.path.normpath(os.path.join(DATA_BASE_PATH, *parts))
+    data_root = os.path.realpath(DATA_BASE_PATH)
+    real_candidate = os.path.realpath(candidate)
+    if os.path.commonpath([data_root, real_candidate]) != data_root:
+        raise ValueError("路径不能超出 data 目录")
+    return candidate
+
+
+def resolve_data_relative_path(path: str) -> str:
+    """Resolve either data-relative or project-relative paths under data."""
+    normalized_path = os.path.normpath(path)
+    data_prefix = DATA_BASE_RELATIVE_PATH + os.sep
+    if os.path.isabs(normalized_path):
+        candidate = normalized_path
+    elif normalized_path == DATA_BASE_RELATIVE_PATH or normalized_path.startswith(data_prefix):
+        candidate = resolve_project_path(normalized_path)
+    else:
+        candidate = resolve_data_path(normalized_path)
+
+    data_root = os.path.realpath(DATA_BASE_PATH)
+    real_candidate = os.path.realpath(candidate)
+    if os.path.commonpath([data_root, real_candidate]) != data_root:
+        raise ValueError("路径不能超出 data 目录")
+    return candidate
 
 
 class Conversation(BaseModel):

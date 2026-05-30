@@ -10,12 +10,17 @@ from .shared import (
     ChunkRequest,
     CreateCategoryRequest,
     DATA_BASE_PATH,
+    DATA_BASE_RELATIVE_PATH,
     UploadFileResponse,
     VectorIdRequest,
     VectorSearchRequest,
     get_current_admin,
     get_current_user,
+    project_relative_path,
     qa_system,
+    resolve_data_path,
+    resolve_data_relative_path,
+    resolve_project_path,
 )
 
 
@@ -105,8 +110,10 @@ async def create_category(request: CreateCategoryRequest, user: dict = Depends(g
         category_name = request.category_name.strip()
         if not category_name:
             raise HTTPException(status_code=400, detail="分类名称不能为空")
+        if os.path.basename(category_name) != category_name or "\\" in category_name:
+            raise HTTPException(status_code=400, detail="分类名称不能包含路径分隔符")
 
-        result = qa_system.mysql_client.create_category(category_name, DATA_BASE_PATH)
+        result = qa_system.mysql_client.create_category(category_name, DATA_BASE_RELATIVE_PATH)
         return {
             "message": "分类创建成功",
             "category_id": result["category_id"],
@@ -205,7 +212,7 @@ async def preview_file(file_id: int, user: dict = Depends(get_current_admin)):
         if file_info["is_dir"]:
             raise HTTPException(status_code=400, detail="无法预览文件夹")
 
-        file_path = file_info["file_path"]
+        file_path = resolve_project_path(file_info["file_path"])
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="文件不存在于文件系统")
 
@@ -274,7 +281,10 @@ async def preview_file(file_id: int, user: dict = Depends(get_current_admin)):
 @router.get("/knowledge/preview")
 async def preview_file_by_path(path: str, user: dict = Depends(get_current_admin)):
     try:
-        file_path = os.path.join(DATA_BASE_PATH, path)
+        try:
+            file_path = resolve_data_relative_path(path)
+        except ValueError as e:
+            raise HTTPException(status_code=403, detail=str(e))
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="文件不存在")
@@ -282,7 +292,7 @@ async def preview_file_by_path(path: str, user: dict = Depends(get_current_admin
         if os.path.isdir(file_path):
             raise HTTPException(status_code=400, detail="无法预览文件夹")
 
-        if not file_path.startswith(DATA_BASE_PATH):
+        if os.path.commonpath([os.path.realpath(DATA_BASE_PATH), os.path.realpath(file_path)]) != os.path.realpath(DATA_BASE_PATH):
             raise HTTPException(status_code=403, detail="无权访问此文件")
 
         file_ext = os.path.splitext(file_path)[1].lower()
@@ -504,16 +514,25 @@ async def upload_file(
         if not category:
             raise HTTPException(status_code=404, detail="分类不存在")
 
-        category_folder = os.path.join(DATA_BASE_PATH, category["category"])
+        original_filename = os.path.basename(file.filename or "")
+        if not original_filename:
+            raise HTTPException(status_code=400, detail="文件名不能为空")
+
+        try:
+            category_folder = resolve_data_path(category["category"])
+            file_path = resolve_data_path(category["category"], original_filename)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         os.makedirs(category_folder, exist_ok=True)
 
-        file_path = os.path.join(category_folder, file.filename)
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
 
+        stored_file_path = project_relative_path(file_path)
         file_id = qa_system.mysql_client.add_file(
-            file_path=file_path,
+            file_path=stored_file_path,
             is_dir=False,
             category_id=category_id,
             is_chunk=False,
@@ -521,8 +540,8 @@ async def upload_file(
 
         return UploadFileResponse(
             file_id=file_id,
-            file_name=file.filename,
-            file_path=file_path,
+            file_name=original_filename,
+            file_path=stored_file_path,
             message="文件上传成功",
         )
     except HTTPException:
@@ -586,9 +605,10 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_ad
         yield f"data: {json.dumps({'type': 'start', 'total': total, 'completed': 0}, ensure_ascii=False)}\n\n"
 
         for file_info in files_to_chunk:
-            file_path = file_info["file_path"]
+            stored_file_path = file_info["file_path"]
+            file_path = resolve_project_path(stored_file_path)
             file_id = file_info["id"]
-            file_name = os.path.basename(file_path)
+            file_name = os.path.basename(stored_file_path)
 
             try:
                 category = qa_system.mysql_client.get_category_by_id(file_info["category_id"])
@@ -611,6 +631,7 @@ async def chunk_files(request: ChunkRequest, user: dict = Depends(get_current_ad
 
                 for chunk in child_chunks:
                     chunk.metadata["file_id"] = file_id
+                    chunk.metadata["file_path"] = stored_file_path
 
                 qa_system.vector_store.add_documents(child_chunks)
                 qa_system.mysql_client.update_file_chunk_status(file_id, True)

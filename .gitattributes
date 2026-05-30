@@ -1,0 +1,13 @@
+integerate_qa_system/rag_qa/models/**/*.bin filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/models/**/*.pt filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/models/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/models/**/*.pth filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/models/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/core/bert_query_classifier/**/*.bin filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/core/bert_query_classifier/**/*.pt filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/core/bert_query_classifier/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/core/bert_query_classifier/**/*.pth filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/nlp_bert_document-segmentation_chinese-base/**/*.bin filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/nlp_bert_document-segmentation_chinese-base/**/*.pt filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/nlp_bert_document-segmentation_chinese-base/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
+integerate_qa_system/rag_qa/nlp_bert_document-segmentation_chinese-base/**/*.pth filter=lfs diff=lfs merge=lfs -text

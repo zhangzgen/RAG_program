@@ -105,6 +105,8 @@ integerate_qa_system/
 
 ```bash
 cd integerate_qa_system
+cp config.example.ini config.ini
+# 编辑 config.ini，填入 LLM、邮箱和 JWT 等配置
 pip install -r requirements.txt
 python api.py
 ```
@@ -124,7 +126,13 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 
 ## 关键配置
 
-配置文件位于 `config.ini`，常见配置包括：
+配置模板位于 `config.example.ini`。首次运行前复制为 `config.ini` 并填入本地配置：
+
+```bash
+cp config.example.ini config.ini
+```
+
+`config.ini` 属于本地配置文件，不会提交到仓库。常见配置包括：
 
 - MySQL
 - Redis
@@ -136,6 +144,22 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 - JWT
 
 请不要把真实密钥、密码、授权码提交到仓库。
+
+## 模型文件
+
+项目运行依赖的本地模型位于：
+
+- `rag_qa/models/bert-base-chinese`
+- `rag_qa/models/bge-m3`
+- `rag_qa/models/bge-reranker-large`
+- `rag_qa/nlp_bert_document-segmentation_chinese-base`
+- `rag_qa/core/bert_query_classifier`
+
+权重文件通过 Git LFS 管理。克隆后如模型权重未自动拉取，请在仓库根目录执行：
+
+```bash
+git lfs pull
+```
 
 ## 数据库说明
 

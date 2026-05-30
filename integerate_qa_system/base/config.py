@@ -34,25 +34,25 @@ THINKING_MODELS = [
 class Config:
     _instance = None
     _config_cache = None
-    
+
     def __new__(cls, config_file=config_file_abspath):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self, config_file=config_file_abspath):
         force_reload = hasattr(self, '_force_reload')
         if Config._config_cache is not None and not force_reload:
             self.__dict__.update(Config._config_cache)
             return
-            
+
         self.config = configparser.ConfigParser()
         self.config.read(config_file, encoding='utf-8')
         self._load_all_config()
         if force_reload and hasattr(self, '_force_reload'):
             delattr(self, '_force_reload')
         Config._config_cache = self.__dict__.copy()
-    
+
     def _load_all_config(self):
         self.MYSQL_HOST = self.config.get('mysql', 'host', fallback='localhost')
         self.MYSQL_USER = self.config.get('mysql', 'user', fallback='root')
@@ -72,14 +72,14 @@ class Config:
         self.LLM_MODEL = self.config.get('llm', 'model', fallback='qwen-plus')
         self.LLM_API_KEY = self.config.get('llm', 'api_key', fallback='') or self.config.get('llm', 'dashscope_api_key', fallback='')
         self.LLM_BASE_URL = self.config.get('llm', 'base_url', fallback='') or self.config.get('llm', 'dashscope_base_url', fallback='https://dashscope.aliyuncs.com/compatible-mode/v1')
-        
+
         if self.LLM_BASE_URL and not self.LLM_BASE_URL.endswith('/v1'):
             if 'deepseek' in self.LLM_BASE_URL.lower():
                 self.LLM_BASE_URL = self.LLM_BASE_URL.rstrip('/') + '/v1'
-        
+
         self.ENABLE_THINKING = self.config.getboolean('llm', 'enable_thinking', fallback=False)
         self.THINKING_BUDGET_TOKENS = self.config.getint('llm', 'thinking_budget_tokens', fallback=10000)
-        
+
         self.DASHSCOPE_API_KEY = self.LLM_API_KEY
         self.DASHSCOPE_BASE_URL = self.LLM_BASE_URL
 
@@ -116,17 +116,17 @@ class Config:
         self.JWT_SECRET_KEY = self.config.get('jwt', 'secret_key', fallback='your_jwt_secret_key_here_change_in_production')
         self.JWT_ALGORITHM = self.config.get('jwt', 'algorithm', fallback='HS256')
         self.JWT_EXPIRE_DAYS = self.config.getint('jwt', 'expire_days', fallback=30)
-    
+
     def is_thinking_model(self):
         """检查当前模型是否为思考模型"""
         model_lower = self.LLM_MODEL.lower()
         return any(tm in model_lower for tm in THINKING_MODELS) or self.ENABLE_THINKING
-    
+
     @classmethod
     def hot_reload(cls, config_file=config_file_abspath):
         """
         热加载配置文件
-        
+
         Returns:
             dict: 包含热加载结果的字典
         """
@@ -136,18 +136,18 @@ class Config:
         instance.__init__(config_file)
         if hasattr(instance, '_force_reload'):
             delattr(instance, '_force_reload')
-        
+
         reloaded = []
         not_reloaded = []
-        
+
         for section, keys in HOT_RELOADABLE_SECTIONS.items():
             for key in keys:
                 reloaded.append(f"{section}.{key}")
-        
+
         for section, keys in NOT_RELOADABLE_SECTIONS.items():
             for key in keys:
                 not_reloaded.append(f"{section}.{key}")
-        
+
         return {
             'success': True,
             'reloaded': reloaded,

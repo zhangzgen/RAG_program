@@ -8,6 +8,7 @@ from edu_ocr import get_ocr
 from langchain_core.documents import Document
 from langchain_core.document_loaders import BaseLoader
 from langchain.text_splitter import CharacterTextSplitter
+from base import logger
 # PDF OCR 控制：只对宽高超过页面一定比例（图片宽/页面宽，图片高/页面高）的图片进行 OCR。
 # 这样可以避免 PDF 中一些小图片的干扰，提高非扫描版 PDF 处理速度
 PDF_OCR_THRESHOLD = (0.6, 0.6)
@@ -38,12 +39,13 @@ class OCRPDFLoader(BaseLoader):
 
 
     def pdf2text(self):
-        ocr = get_ocr()
         # 打开pdf文件
         doc = fitz.open(self.file_path)
         ## 获取页数
         # print(f'len(doc)-->{len(doc)}')
         resp = ""
+        ocr = None
+        ocr_unavailable_logged = False
         b_unit = tqdm(total=doc.page_count, desc="OCRPDFLoader context page index: 0")
         for i, page in enumerate(doc):
             b_unit.set_description("OCRPDFLoader context page index: {}".format(i))
@@ -67,6 +69,14 @@ class OCRPDFLoader(BaseLoader):
                     if ((bbox[2] - bbox[0]) / (page.rect.width) < PDF_OCR_THRESHOLD[0]
                             or (bbox[3] - bbox[1]) / (page.rect.height) < PDF_OCR_THRESHOLD[1]):
                         continue
+                    if ocr is None:
+                        try:
+                            ocr = get_ocr()
+                        except ImportError as e:
+                            if not ocr_unavailable_logged:
+                                logger.warning(f"PDF OCR依赖不可用，跳过图片OCR: {e}")
+                                ocr_unavailable_logged = True
+                            continue
                     pix = fitz.Pixmap(doc, xref)
                     # print(f'page.rotation-->{page.rotation}')
                     if int(page.rotation) != 0:  # 如果Page有旋转角度，则旋转图片

@@ -28,6 +28,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv.corrupt-*/
 
 # IDE
 .idea/
@@ -35,6 +36,10 @@ venv.bak/
 *.swp
 *.swo
 *~
+.agents/
+.claude/
+.playwright-cli/
+.workbuddy/
 
 # Logs
 logs/
@@ -43,15 +48,43 @@ logs/
 # Local config
 config.ini
 *.local
-
-# Model files (large files)
-*.bin
-*.pt
-*.safetensors
-*.pth
+*.secret
 
 # Node
 node_modules/
+dist/
+dist-ssr/
+
+# Runtime data, uploads, generated artifacts
+output/
+ref_docx_render/
+diagrams/
+paper_extracted.txt
+integerate_qa_system/data/**
+!integerate_qa_system/data/
+!integerate_qa_system/data/.gitkeep
+integerate_qa_system/d:*/
+integerate_qa_system/rag_qa/rag_accessment/uploads/
+integerate_qa_system/rag_qa/rag_accessment/*results*.csv
+integerate_qa_system/mysql_qa/data/fqa_export*.csv
+integerate_qa_system/rag_qa/core/bert_logs/
+integerate_qa_system/rag_qa/core/bert_results/
+integerate_qa_system/rag_qa/core/bert_query_classifier_backup_*/
+**/.cache/
+*.incomplete
+
+# Archives and install packages
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.whl
+*.dmg
+*.pkg
+*.exe
+*.msi
 
 # OS
 .DS_Store

@@ -668,7 +668,7 @@ const ChatAreaModern = forwardRef(({ sessionData, onSessionCreated, isAdmin }, r
                 event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
               }}
               onKeyDown={handleKeyDown}
-              placeholder="给 DeepSeek 发送消息"
+              placeholder="给 小智 发送消息"
               className="chat-input-modern"
               disabled={isLoading}
               rows={1}

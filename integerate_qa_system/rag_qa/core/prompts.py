@@ -59,10 +59,10 @@ class RAGPrompts:
     def hyde_prompt():
         #   创建并返回 PromptTemplate 对象
         return PromptTemplate(
-            template="""  
-            假设你是用户，想了解以下问题，请生成一个简短的假设答案：  
-            问题: {query}  
-            假设答案:  
+            template="""
+            假设你是用户，想了解以下问题，请生成一个简短的假设答案：
+            问题: {query}
+            假设答案:
             """,
             #   定义输入变量
             input_variables=["query"],
@@ -73,10 +73,10 @@ class RAGPrompts:
     def subquery_prompt():
         #   创建并返回 PromptTemplate 对象
         return PromptTemplate(
-            template="""  
-            将以下复杂查询分解为多个简单子查询，每行一个子查询：  
-            查询: {query}  
-            子查询:  
+            template="""
+            将以下复杂查询分解为多个简单子查询，每行一个子查询：
+            查询: {query}
+            子查询:
             """,
             #   定义输入变量
             input_variables=["query"],
@@ -87,10 +87,10 @@ class RAGPrompts:
     def backtracking_prompt():
         #   创建并返回 PromptTemplate 对象
         return PromptTemplate(
-            template="""  
-            将以下复杂查询简化为一个更简单的问题：  
-            查询: {query}  
-            简化问题:  
+            template="""
+            将以下复杂查询简化为一个更简单的问题：
+            查询: {query}
+            简化问题:
             """,
             #   定义输入变量
             input_variables=["query"],

@@ -124,7 +124,7 @@ code {
   body {
     font-size: 14px;
   }
-  
+
   .app-modern-container {
     overflow-x: hidden;
   }
@@ -139,7 +139,7 @@ code {
   .input-container-modern {
     display: none !important;
   }
-  
+
   .main-modern-area {
     width: 100% !important;
   }

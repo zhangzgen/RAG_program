@@ -42,10 +42,10 @@ class IntegratedQASystem:
         try:
             api_key = self.config.LLM_API_KEY or self.config.DASHSCOPE_API_KEY
             base_url = self.config.LLM_BASE_URL or self.config.DASHSCOPE_BASE_URL
-            
+
             if not api_key:
                 raise ValueError("LLM API Key 未配置")
-            
+
             self.client = OpenAI(api_key=api_key, base_url=base_url)
             self.logger.info(f"LLM客户端初始化成功: model={self.config.LLM_MODEL}, base_url={base_url}")
         except Exception as e:
@@ -206,9 +206,9 @@ class IntegratedQASystem:
                     INSERT INTO conversations (session_id, query, answer, created_at)
                     VALUES (%s, %s, %s, NOW())
                 """, (session_id, question, answer))
-            
+
             conversation_id = self.mysql_client.cursor.lastrowid
-            
+
             history = self._fetch_recent_history(session_id)
             self.mysql_client.cursor.execute("""
                 DELETE FROM conversations
@@ -266,12 +266,12 @@ class IntegratedQASystem:
             session_id=session_id,
             source_filter=source_filter
         )
-        
+
         # 记录查询信息到日志
         self.logger.info(f"处理查询: '{query}' (会话ID: {session_id})")
         # 获取对话历史，若无 session_id 则返回空列表
         history = history if history is not None else (self.get_session_history(session_id) if session_id else [])
-        
+
         # ===== Step 1: FQA搜索 (BM25) =====
         trace.fqa.start()
         trace.fqa.input = query
@@ -281,7 +281,7 @@ class IntegratedQASystem:
                 trace.fqa.matched = True
                 trace.fqa.finish(output=answer, status='success')
                 trace.finish(answer=answer, source='fqa')
-                
+
                 self.logger.info(f"FQA答案: {answer}")
                 conversation_id = self._persist_generated_result(
                     session_id=session_id,
@@ -299,7 +299,7 @@ class IntegratedQASystem:
             trace.fqa.fail(str(e))
             self.logger.error(f"FQA搜索失败: {e}")
             need_rag = True
-        
+
         # ===== Step 2: 查询分类 =====
         trace.query_classify.start()
         trace.query_classify.input = query
@@ -312,18 +312,18 @@ class IntegratedQASystem:
             trace.query_classify.fail(str(e))
             query_category = "专业咨询"
             self.logger.error(f"查询分类失败: {e}")
-        
+
         # 如果是通用知识，直接调用LLM
         if query_category == "通用知识":
             trace.strategy_select.skip("通用知识无需检索策略")
             trace.vector_retrieval.skip("通用知识无需向量检索")
-            
+
             # LLM调用
             trace.llm.start()
             trace.llm.input = query
             trace.llm.model = self.config.LLM_MODEL
             trace.llm.is_thinking_model = self.config.is_thinking_model()
-            
+
             collected_answer = ""
             collected_thinking = ""
             try:
@@ -362,7 +362,7 @@ class IntegratedQASystem:
             )
             yield 'complete', '', True, conversation_id
             return
-        
+
         # ===== Step 3: 检索策略选择 =====
         trace.strategy_select.start()
         trace.strategy_select.input = query
@@ -375,19 +375,19 @@ class IntegratedQASystem:
             trace.strategy_select.fail(str(e))
             strategy = "直接检索"
             self.logger.error(f"策略选择失败: {e}")
-        
+
         # ===== Step 4: 向量检索 =====
         trace.vector_retrieval.start()
         trace.vector_retrieval.input = query
         trace.vector_retrieval.strategy_used = strategy
         trace.vector_retrieval.retrieval_k = self.config.RETRIEVAL_K
         trace.vector_retrieval.candidate_m = self.config.CANDIDATE_M
-        
+
         try:
             context_docs = self.rag_system.retrieve_and_merge(
                 query, source_filter=source_filter, strategy=strategy
             )
-            
+
             # 记录检索结果
             results = []
             for doc in context_docs:
@@ -404,25 +404,25 @@ class IntegratedQASystem:
             trace.vector_retrieval.results = results
             trace.vector_retrieval.total_results = len(context_docs)
             trace.vector_retrieval.finish(output=f"{len(context_docs)} documents", status='success')
-            
+
             self.logger.info(f"检索到 {len(context_docs)} 个文档")
         except Exception as e:
             trace.vector_retrieval.fail(str(e))
             context_docs = []
             self.logger.error(f"向量检索失败: {e}")
-        
+
         # 准备上下文
         if context_docs:
             context = "\n\n".join([doc.page_content for doc in context_docs])
         else:
             context = ""
             self.logger.info("未检索到相关文档")
-        
+
         # ===== Step 5: LLM生成 =====
         trace.llm.start()
         trace.llm.model = self.config.LLM_MODEL
         trace.llm.is_thinking_model = self.config.is_thinking_model()
-        
+
         # 格式化对话历史
         history_text = self._build_history_text(history)
         if False and history:
@@ -431,12 +431,12 @@ class IntegratedQASystem:
                 history_text += f"用户: {entry.get('query', '')}\n助手: {entry.get('answer', '')}\n"
                 if i < len(history) - 1:
                     history_text += "\n"
-        
+
         prompt = self.rag_system.rag_prompt.format(
             context=context, history=history_text, question=query, phone=self.config.CUSTOMER_SERVICE_PHONE
         )
         trace.llm.input = prompt[:500] + '...' if len(prompt) > 500 else prompt
-        
+
         collected_answer = ""
         collected_thinking = ""
         try:

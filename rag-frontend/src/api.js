@@ -207,7 +207,7 @@ export const previewFile = async (fileId) => {
 export const uploadFile = async (categoryId, file) => {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await api.post(`/knowledge/categories/${categoryId}/upload`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -235,7 +235,7 @@ export const previewFileByPath = async (path) => {
 export const uploadFileToCategory = async (categoryId, file) => {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await api.post(`/knowledge/categories/${categoryId}/upload`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -268,13 +268,13 @@ export const getKnowledgeSources = async () => {
 export const chunkFiles = async (fileIds = [], categoryId = null, onProgress, onComplete, onError) => {
   ensureAdminAccess();
   const token = localStorage.getItem('token');
-  
+
   return new Promise((resolve, reject) => {
     const eventSource = new EventSource(
       `${API_BASE_URL}/knowledge/chunk/stream?file_ids=${fileIds.join(',')}&category_id=${categoryId || ''}&token=${token}`,
       { withCredentials: true }
     );
-    
+
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -291,7 +291,7 @@ export const chunkFiles = async (fileIds = [], categoryId = null, onProgress, on
         console.error('解析SSE数据失败:', e);
       }
     };
-    
+
     eventSource.onerror = (error) => {
       eventSource.close();
       if (onError) onError(error);
@@ -303,7 +303,7 @@ export const chunkFiles = async (fileIds = [], categoryId = null, onProgress, on
 export const chunkFilesPost = async (fileIds = [], categoryId = null, onMessage) => {
   ensureAdminAccess();
   const token = localStorage.getItem('token');
-  
+
   const response = await fetch(`${API_BASE_URL}/knowledge/chunk`, {
     method: 'POST',
     headers: {
@@ -315,22 +315,22 @@ export const chunkFilesPost = async (fileIds = [], categoryId = null, onMessage)
       category_id: categoryId,
     }),
   });
-  
+
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-  
+
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let result;
-  
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
+
     const chunk = decoder.decode(value, { stream: true });
     const lines = chunk.split('\n');
-    
+
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         try {
@@ -343,7 +343,7 @@ export const chunkFilesPost = async (fileIds = [], categoryId = null, onMessage)
       }
     }
   }
-  
+
   return result;
 };
 

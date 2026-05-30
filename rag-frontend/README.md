@@ -30,6 +30,8 @@ npm run dev
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
+`.env` 属于本地配置文件，不会提交到仓库。仓库中保留 `.env.example` 作为模板。
+
 ## 常用脚本
 
 ```bash

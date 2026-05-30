@@ -1,54 +1,126 @@
 ---
 license: mit
 language:
-- zh
 - en
+- zh
+tags:
+- mteb
+model-index:
+- name: bge-reranker-base
+  results:
+  - task:
+      type: Reranking
+    dataset:
+      type: C-MTEB/CMedQAv1-reranking
+      name: MTEB CMedQAv1
+      config: default
+      split: test
+      revision: None
+    metrics:
+    - type: map
+      value: 81.27206722525007
+    - type: mrr
+      value: 84.14238095238095
+  - task:
+      type: Reranking
+    dataset:
+      type: C-MTEB/CMedQAv2-reranking
+      name: MTEB CMedQAv2
+      config: default
+      split: test
+      revision: None
+    metrics:
+    - type: map
+      value: 84.10369934291236
+    - type: mrr
+      value: 86.79376984126984
+  - task:
+      type: Reranking
+    dataset:
+      type: C-MTEB/Mmarco-reranking
+      name: MTEB MMarcoReranking
+      config: default
+      split: dev
+      revision: None
+    metrics:
+    - type: map
+      value: 35.4600511272538
+    - type: mrr
+      value: 34.60238095238095
+  - task:
+      type: Reranking
+    dataset:
+      type: C-MTEB/T2Reranking
+      name: MTEB T2Reranking
+      config: default
+      split: dev
+      revision: None
+    metrics:
+    - type: map
+      value: 67.27728847727172
+    - type: mrr
+      value: 77.1315192743764
+pipeline_tag: feature-extraction
 ---
 
+**We have updated the [new reranker](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/llm_reranker), supporting larger lengths, more languages, and achieving better performance.**
 
 <h1 align="center">FlagEmbedding</h1>
 
 
 <h4 align="center">
     <p>
-        <a href=#model-list>Model List</a> | 
+        <a href=#model-list>Model List</a> |
         <a href=#frequently-asked-questions>FAQ</a> |
         <a href=#usage>Usage</a>  |
         <a href="#evaluation">Evaluation</a> |
         <a href="#train">Train</a> |
-        <a href="#contact">Contact</a> |
         <a href="#citation">Citation</a> |
-        <a href="#license">License</a> 
+        <a href="#license">License</a>
     <p>
 </h4>
 
-More details please refer to our Github: [FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding).
+**More details please refer to our Github: [FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding).**
 
 
 [English](README.md) | [中文](https://github.com/FlagOpen/FlagEmbedding/blob/master/README_zh.md)
 
-FlagEmbedding can map any text to a low-dimensional dense vector which can be used for tasks like retrieval, classification,  clustering, or semantic search.
-And it also can be used in vector databases for LLMs.
 
-************* 🌟**Updates**🌟 *************
-- 10/12/2023: Release [LLM-Embedder](./FlagEmbedding/llm_embedder/README.md), a unified embedding model to support diverse retrieval augmentation needs for LLMs. [Paper](https://arxiv.org/pdf/2310.07554.pdf)  :fire:  
-- 09/15/2023: The [technical report](https://arxiv.org/pdf/2309.07597.pdf) of BGE has been released 
-- 09/15/2023: The [masive training data](https://data.baai.ac.cn/details/BAAI-MTP) of BGE has been released 
-- 09/12/2023: New models: 
-    - **New reranker model**: release cross-encoder models `BAAI/bge-reranker-base` and `BAAI/bge-reranker-large`, which are more powerful than embedding model. We recommend to use/fine-tune them to re-rank top-k documents returned by embedding models. 
+FlagEmbedding focuses on retrieval-augmented LLMs, consisting of the following projects currently:
+
+- **Long-Context LLM**: [Activation Beacon](https://github.com/FlagOpen/FlagEmbedding/tree/master/Long_LLM/activation_beacon)
+- **Fine-tuning of LM** : [LM-Cocktail](https://github.com/FlagOpen/FlagEmbedding/tree/master/LM_Cocktail)
+- **Embedding Model**: [Visualized-BGE](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/visual), [BGE-M3](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/BGE_M3), [LLM Embedder](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/llm_embedder), [BGE Embedding](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/baai_general_embedding)
+- **Reranker Model**: [llm rerankers](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/llm_reranker), [BGE Reranker](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/reranker)
+- **Benchmark**: [C-MTEB](https://github.com/FlagOpen/FlagEmbedding/tree/master/C_MTEB)
+
+## News
+- 3/18/2024: Release new [rerankers](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/llm_reranker), built upon powerful M3 and LLM (GEMMA and MiniCPM, not so large actually) backbones, supporitng multi-lingual processing and larger inputs, massive improvements of ranking performances on BEIR, C-MTEB/Retrieval, MIRACL, LlamaIndex Evaluation.
+- 3/18/2024: Release [Visualized-BGE](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/visual), equipping BGE with visual capabilities. Visualized-BGE can be utilized to generate embeddings for hybrid image-text data.
+- 1/30/2024: Release **BGE-M3**, a new member to BGE model series! M3 stands for **M**ulti-linguality (100+ languages), **M**ulti-granularities (input length up to 8192), **M**ulti-Functionality (unification of dense, lexical, multi-vec/colbert retrieval).
+It is the first embedding model which supports all three retrieval methods, achieving new SOTA on multi-lingual (MIRACL) and cross-lingual (MKQA) benchmarks.
+[Technical Report](https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/BGE_M3/BGE_M3.pdf) and [Code](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/BGE_M3). :fire:
+- 1/9/2024: Release [Activation-Beacon](https://github.com/FlagOpen/FlagEmbedding/tree/master/Long_LLM/activation_beacon), an effective, efficient, compatible, and low-cost (training) method to extend the context length of LLM. [Technical Report](https://arxiv.org/abs/2401.03462) :fire:
+- 12/24/2023: Release **LLaRA**, a LLaMA-7B based dense retriever, leading to state-of-the-art performances on MS MARCO and BEIR. Model and code will be open-sourced. Please stay tuned. [Technical Report](https://arxiv.org/abs/2312.15503)
+- 11/23/2023: Release [LM-Cocktail](https://github.com/FlagOpen/FlagEmbedding/tree/master/LM_Cocktail), a method to maintain general capabilities during fine-tuning by merging multiple language models. [Technical Report](https://arxiv.org/abs/2311.13534) :fire:
+- 10/12/2023: Release [LLM-Embedder](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/llm_embedder), a unified embedding model to support diverse retrieval augmentation needs for LLMs. [Technical Report](https://arxiv.org/pdf/2310.07554.pdf)
+- 09/15/2023: The [technical report](https://arxiv.org/pdf/2309.07597.pdf) of BGE has been released
+- 09/15/2023: The [massive training data](https://data.baai.ac.cn/details/BAAI-MTP) of BGE has been released
+- 09/12/2023: New models:
+    - **New reranker model**: release cross-encoder models `BAAI/bge-reranker-base` and `BAAI/bge-reranker-large`, which are more powerful than embedding model. We recommend to use/fine-tune them to re-rank top-k documents returned by embedding models.
     - **update embedding model**: release `bge-*-v1.5` embedding model to alleviate the issue of the similarity distribution, and enhance its retrieval ability without instruction.
- 
+
 
 <details>
   <summary>More</summary>
 <!-- ### More -->
-    
-- 09/07/2023: Update [fine-tune code](https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/baai_general_embedding/README.md): Add script to mine hard negatives and support adding instruction during fine-tuning. 
-- 08/09/2023: BGE Models are integrated into **Langchain**, you can use it like [this](#using-langchain); C-MTEB **leaderboard** is [available](https://huggingface.co/spaces/mteb/leaderboard).  
-- 08/05/2023: Release base-scale and small-scale models, **best performance among the models of the same size 🤗**  
-- 08/02/2023: Release `bge-large-*`(short for BAAI General Embedding) Models, **rank 1st on MTEB and C-MTEB benchmark!** :tada: :tada:   
-- 08/01/2023: We release the [Chinese Massive Text Embedding Benchmark](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB) (**C-MTEB**), consisting of 31 test dataset.  
-  
+
+- 09/07/2023: Update [fine-tune code](https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/baai_general_embedding/README.md): Add script to mine hard negatives and support adding instruction during fine-tuning.
+- 08/09/2023: BGE Models are integrated into **Langchain**, you can use it like [this](#using-langchain); C-MTEB **leaderboard** is [available](https://huggingface.co/spaces/mteb/leaderboard).
+- 08/05/2023: Release base-scale and small-scale models, **best performance among the models of the same size 🤗**
+- 08/02/2023: Release `bge-large-*`(short for BAAI General Embedding) Models, **rank 1st on MTEB and C-MTEB benchmark!** :tada: :tada:
+- 08/01/2023: We release the [Chinese Massive Text Embedding Benchmark](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB) (**C-MTEB**), consisting of 31 test dataset.
+
 </details>
 
 
@@ -58,6 +130,7 @@ And it also can be used in vector databases for LLMs.
 
 |              Model              | Language | | Description | query instruction for retrieval [1] |
 |:-------------------------------|:--------:| :--------:| :--------:|:--------:|
+| [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3)                   |    Multilingual     |    [Inference](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/BGE_M3#usage) [Fine-tune](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/BGE_M3)    | Multi-Functionality(dense retrieval, sparse retrieval, multi-vector(colbert)), Multi-Linguality, and Multi-Granularity(8192 tokens) |  |
 |  [BAAI/llm-embedder](https://huggingface.co/BAAI/llm-embedder)  |   English | [Inference](./FlagEmbedding/llm_embedder/README.md) [Fine-tune](./FlagEmbedding/llm_embedder/README.md) | a unified embedding model to support diverse retrieval augmentation needs for LLMs | See [README](./FlagEmbedding/llm_embedder/README.md) |
 |  [BAAI/bge-reranker-large](https://huggingface.co/BAAI/bge-reranker-large)  |   Chinese and English | [Inference](#usage-for-reranker) [Fine-tune](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/reranker) | a cross-encoder model which is more accurate but less efficient [2] |   |
 |  [BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base) |   Chinese and English | [Inference](#usage-for-reranker) [Fine-tune](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/reranker) | a cross-encoder model which is more accurate but less efficient [2] |   |
@@ -77,10 +150,10 @@ And it also can be used in vector databases for LLMs.
 
 [1\]: If you need to search the relevant passages to a query, we suggest to add the instruction to the query; in other cases, no instruction is needed, just use the original query directly. In all cases, **no instruction** needs to be added to passages.
 
-[2\]: Different from embedding model, reranker uses question and document as input and directly output similarity instead of embedding. To balance the accuracy and time cost, cross-encoder is widely used to re-rank top-k documents retrieved by other simple models. 
+[2\]: Different from embedding model, reranker uses question and document as input and directly output similarity instead of embedding. To balance the accuracy and time cost, cross-encoder is widely used to re-rank top-k documents retrieved by other simple models.
 For examples, use bge embedding model to retrieve top 100 relevant documents, and then use bge reranker to re-rank the top 100 document to get the final top-3 results.
 
-All models have been uploaded to Huggingface Hub, and you can see them at https://huggingface.co/BAAI. 
+All models have been uploaded to Huggingface Hub, and you can see them at https://huggingface.co/BAAI.
 If you cannot open the Huggingface Hub, you also can download the models at https://model.baai.ac.cn/models .
 
 
@@ -90,28 +163,29 @@ If you cannot open the Huggingface Hub, you also can download the models at http
   <summary>1. How to fine-tune bge embedding model?</summary>
 
   <!-- ### How to fine-tune bge embedding model? -->
-Following this [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/finetune) to prepare data and fine-tune your model. 
+Following this [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/finetune) to prepare data and fine-tune your model.
 Some suggestions:
 - Mine hard negatives following this [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/finetune#hard-negatives), which can improve the retrieval performance.
 - If you pre-train bge on your data, the pre-trained model cannot be directly used to calculate similarity, and it must be fine-tuned with contrastive learning before computing similarity.
-- If the accuracy of the fine-tuned model is still not high, it is recommended to use/fine-tune the cross-encoder model (bge-reranker) to re-rank top-k results. Hard negatives also are needed to fine-tune reranker.
+- If the accuracy of the fine-tuned model is still not high, it is recommended to use/fine-tune the cross-encoder model (bge-reranker) to re-rank top-k results.
+  Hard negatives also are needed to fine-tune reranker. Refer to this [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/reranker) for the fine-tuning for reranker
 
-  
+
 </details>
 
 <details>
   <summary>2. The similarity score between two dissimilar sentences is higher than 0.5</summary>
 
   <!-- ### The similarity score between two dissimilar sentences is higher than 0.5 -->
-**Suggest to use bge v1.5, which alleviates the issue of the similarity distribution.** 
+**Suggest to use bge v1.5, which alleviates the issue of the similarity distribution.**
 
-Since we finetune the models by contrastive learning with a temperature of 0.01, 
+Since we finetune the models by contrastive learning with a temperature of 0.01,
 the similarity distribution of the current BGE model is about in the interval \[0.6, 1\].
 So a similarity score greater than 0.5 does not indicate that the two sentences are similar.
 
-For downstream tasks, such as passage retrieval or semantic similarity, 
+For downstream tasks, such as passage retrieval or semantic similarity,
 **what matters is the relative order of the scores, not the absolute value.**
-If you need to filter similar sentences based on a similarity threshold, 
+If you need to filter similar sentences based on a similarity threshold,
 please select an appropriate similarity threshold based on the similarity distribution on your data (such as 0.8, 0.85, or even 0.9).
 
 </details>
@@ -121,23 +195,23 @@ please select an appropriate similarity threshold based on the similarity distri
 
   <!-- ### When does the query instruction need to be used -->
 
-For the `bge-*-v1.5`, we improve its retrieval ability when not using instruction. 
-No instruction only has a slight degradation in retrieval performance compared with using instruction. 
+For the `bge-*-v1.5`, we improve its retrieval ability when not using instruction.
+No instruction only has a slight degradation in retrieval performance compared with using instruction.
 So you can generate embedding without instruction in all cases for convenience.
- 
-For a retrieval task that uses short queries to find long related documents, 
+
+For a retrieval task that uses short queries to find long related documents,
 it is recommended to add instructions for these short queries.
 **The best method to decide whether to add instructions for queries is choosing the setting that achieves better performance on your task.**
-In all cases, the documents/passages do not need to add the instruction. 
+In all cases, the documents/passages do not need to add the instruction.
 
 </details>
 
 
-## Usage 
+## Usage
 
 ### Usage for Embedding Model
 
-Here are some examples for using `bge` models with 
+Here are some examples for using `bge` models with
 [FlagEmbedding](#using-flagembedding), [Sentence-Transformers](#using-sentence-transformers), [Langchain](#using-langchain), or [Huggingface Transformers](#using-huggingface-transformers).
 
 #### Using FlagEmbedding
@@ -150,7 +224,7 @@ If it doesn't work for you, you can see [FlagEmbedding](https://github.com/FlagO
 from FlagEmbedding import FlagModel
 sentences_1 = ["样例数据-1", "样例数据-2"]
 sentences_2 = ["样例数据-3", "样例数据-4"]
-model = FlagModel('BAAI/bge-large-zh-v1.5', 
+model = FlagModel('BAAI/bge-large-zh-v1.5',
                   query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：",
                   use_fp16=True) # Setting use_fp16 to True speeds up computation with a slight performance degradation
 embeddings_1 = model.encode(sentences_1)
@@ -166,7 +240,7 @@ q_embeddings = model.encode_queries(queries)
 p_embeddings = model.encode(passages)
 scores = q_embeddings @ p_embeddings.T
 ```
-For the value of the argument `query_instruction_for_retrieval`, see [Model List](https://github.com/FlagOpen/FlagEmbedding/tree/master#model-list). 
+For the value of the argument `query_instruction_for_retrieval`, see [Model List](https://github.com/FlagOpen/FlagEmbedding/tree/master#model-list).
 
 By default, FlagModel will use all available GPUs when encoding. Please set `os.environ["CUDA_VISIBLE_DEVICES"]` to select specific GPUs.
 You also can set `os.environ["CUDA_VISIBLE_DEVICES"]=""` to make all GPUs unavailable.
@@ -189,8 +263,8 @@ embeddings_2 = model.encode(sentences_2, normalize_embeddings=True)
 similarity = embeddings_1 @ embeddings_2.T
 print(similarity)
 ```
-For s2p(short query to long passage) retrieval task, 
-each short query should start with an instruction (instructions see [Model List](https://github.com/FlagOpen/FlagEmbedding/tree/master#model-list)). 
+For s2p(short query to long passage) retrieval task,
+each short query should start with an instruction (instructions see [Model List](https://github.com/FlagOpen/FlagEmbedding/tree/master#model-list)).
 But the instruction is not needed for passages.
 ```python
 from sentence_transformers import SentenceTransformer
@@ -204,7 +278,7 @@ p_embeddings = model.encode(passages, normalize_embeddings=True)
 scores = q_embeddings @ p_embeddings.T
 ```
 
-#### Using Langchain 
+#### Using Langchain
 
 You can use `bge` in langchain like this:
 ```python
@@ -254,8 +328,8 @@ print("Sentence embeddings:", sentence_embeddings)
 
 ### Usage for Reranker
 
-Different from embedding model, reranker uses question and document as input and directly output similarity instead of embedding. 
-You can get a relevance score by inputting query and passage to the reranker. 
+Different from embedding model, reranker uses question and document as input and directly output similarity instead of embedding.
+You can get a relevance score by inputting query and passage to the reranker.
 The reranker is optimized based cross-entropy loss, so the relevance score is not bounded to a specific range.
 
 
@@ -294,24 +368,70 @@ with torch.no_grad():
     print(scores)
 ```
 
-## Evaluation  
+#### Usage reranker with the ONNX files
+
+```python
+from optimum.onnxruntime import ORTModelForSequenceClassification  # type: ignore
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-reranker-large')
+model = AutoModelForSequenceClassification.from_pretrained('BAAI/bge-reranker-base')
+model_ort = ORTModelForSequenceClassification.from_pretrained('BAAI/bge-reranker-base', file_name="onnx/model.onnx")
+
+# Sentences we want sentence embeddings for
+pairs = [['what is panda?', 'hi'], ['what is panda?', 'The giant panda (Ailuropoda melanoleuca), sometimes called a panda bear or simply panda, is a bear species endemic to China.']]
+
+# Tokenize sentences
+encoded_input = tokenizer(pairs, padding=True, truncation=True, return_tensors='pt')
+
+scores_ort = model_ort(**encoded_input, return_dict=True).logits.view(-1, ).float()
+# Compute token embeddings
+with torch.inference_mode():
+    scores = model_ort(**encoded_input, return_dict=True).logits.view(-1, ).float()
+
+# scores and scores_ort are identical
+```
+#### Usage reranker with infinity
+
+Its also possible to deploy the onnx/torch files with the [infinity_emb](https://github.com/michaelfeil/infinity) pip package.
+```python
+import asyncio
+from infinity_emb import AsyncEmbeddingEngine, EngineArgs
+
+query='what is a panda?'
+docs = ['The giant panda (Ailuropoda melanoleuca), sometimes called a panda bear', "Paris is in France."]
+
+engine = AsyncEmbeddingEngine.from_args(
+    EngineArgs(model_name_or_path = "BAAI/bge-reranker-base", device="cpu", engine="torch" # or engine="optimum" for onnx
+))
+
+async def main():
+    async with engine:
+        ranking, usage = await engine.rerank(query=query, docs=docs)
+        print(list(zip(ranking, docs)))
+asyncio.run(main())
+```
+
+## Evaluation
 
 `baai-general-embedding` models achieve **state-of-the-art performance on both MTEB and C-MTEB leaderboard!**
-For more details and evaluation tools see our [scripts](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB/README.md). 
+For more details and evaluation tools see our [scripts](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB/README.md).
 
-- **MTEB**:   
+- **MTEB**:
 
 | Model Name |  Dimension | Sequence Length | Average (56) | Retrieval (15) |Clustering (11) | Pair Classification (3) | Reranking (4) |  STS (10) | Summarization (1) | Classification (12) |
 |:----:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| [BAAI/bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | 1024 | 512 |  **64.23** | **54.29** |  46.08 | 87.12 | 60.03 | 83.11 | 31.61 | 75.97 |  
-| [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) |  768 | 512 | 63.55 | 53.25 |   45.77 | 86.55 | 58.86 | 82.4 | 31.07 | 75.53 |  
-| [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) |  384 | 512 | 62.17 |51.68 | 43.82 |  84.92 | 58.36 | 81.59 | 30.12 | 74.14 |  
-| [bge-large-en](https://huggingface.co/BAAI/bge-large-en) |  1024 | 512 | 63.98 |  53.9 | 46.98 | 85.8 | 59.48 | 81.56 | 32.06 | 76.21 | 
-| [bge-base-en](https://huggingface.co/BAAI/bge-base-en) |  768 | 512 |  63.36 | 53.0 | 46.32 | 85.86 | 58.7 | 81.84 | 29.27 | 75.27 | 
+| [BAAI/bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | 1024 | 512 |  **64.23** | **54.29** |  46.08 | 87.12 | 60.03 | 83.11 | 31.61 | 75.97 |
+| [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) |  768 | 512 | 63.55 | 53.25 |   45.77 | 86.55 | 58.86 | 82.4 | 31.07 | 75.53 |
+| [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) |  384 | 512 | 62.17 |51.68 | 43.82 |  84.92 | 58.36 | 81.59 | 30.12 | 74.14 |
+| [bge-large-en](https://huggingface.co/BAAI/bge-large-en) |  1024 | 512 | 63.98 |  53.9 | 46.98 | 85.8 | 59.48 | 81.56 | 32.06 | 76.21 |
+| [bge-base-en](https://huggingface.co/BAAI/bge-base-en) |  768 | 512 |  63.36 | 53.0 | 46.32 | 85.86 | 58.7 | 81.84 | 29.27 | 75.27 |
 | [gte-large](https://huggingface.co/thenlper/gte-large) |  1024 | 512 | 63.13 | 52.22 | 46.84 | 85.00 | 59.13 | 83.35 | 31.66 | 73.33 |
 | [gte-base](https://huggingface.co/thenlper/gte-base) 	|  768 | 512 | 62.39 | 51.14 | 46.2 | 84.57 | 58.61 | 82.3 | 31.17 | 73.01 |
 | [e5-large-v2](https://huggingface.co/intfloat/e5-large-v2) |  1024| 512 | 62.25 | 50.56 | 44.49 | 86.03 | 56.61 | 82.05 | 30.19 | 75.24 |
-| [bge-small-en](https://huggingface.co/BAAI/bge-small-en) |  384 | 512 | 62.11 |  51.82 | 44.31 | 83.78 | 57.97 | 80.72 | 30.53 | 74.37 |  
+| [bge-small-en](https://huggingface.co/BAAI/bge-small-en) |  384 | 512 | 62.11 |  51.82 | 44.31 | 83.78 | 57.97 | 80.72 | 30.53 | 74.37 |
 | [instructor-xl](https://huggingface.co/hkunlp/instructor-xl) |  768 | 512 | 61.79 | 49.26 | 44.74 | 86.62 | 57.29 | 83.06 | 32.32 | 61.79 |
 | [e5-base-v2](https://huggingface.co/intfloat/e5-base-v2) |  768 | 512 | 61.5 | 50.29 | 43.80 | 85.73 | 55.91 | 81.05 | 30.28 | 73.84 |
 | [gte-small](https://huggingface.co/thenlper/gte-small) |  384 | 512 | 61.36 | 49.46 | 44.89 | 83.54 | 57.7 | 82.07 | 30.42 | 72.31 |
@@ -323,15 +443,15 @@ For more details and evaluation tools see our [scripts](https://github.com/FlagO
 
 
 
-- **C-MTEB**:  
-We create the benchmark C-MTEB for Chinese text embedding which consists of 31 datasets from 6 tasks. 
+- **C-MTEB**:
+We create the benchmark C-MTEB for Chinese text embedding which consists of 31 datasets from 6 tasks.
 Please refer to [C_MTEB](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB/README.md) for a detailed introduction.
- 
+
 | Model | Embedding dimension | Avg | Retrieval | STS | PairClassification | Classification | Reranking | Clustering |
 |:-------------------------------|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
-| [**BAAI/bge-large-zh-v1.5**](https://huggingface.co/BAAI/bge-large-zh-v1.5) | 1024 |  **64.53** | 70.46 | 56.25 | 81.6 | 69.13 | 65.84 | 48.99 |  
-| [BAAI/bge-base-zh-v1.5](https://huggingface.co/BAAI/bge-base-zh-v1.5) | 768 |  63.13 | 69.49 | 53.72 | 79.75 | 68.07 | 65.39 | 47.53 |  
-| [BAAI/bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5) | 512 | 57.82 | 61.77 | 49.11 | 70.41 | 63.96 | 60.92 | 44.18 |   
+| [**BAAI/bge-large-zh-v1.5**](https://huggingface.co/BAAI/bge-large-zh-v1.5) | 1024 |  **64.53** | 70.46 | 56.25 | 81.6 | 69.13 | 65.84 | 48.99 |
+| [BAAI/bge-base-zh-v1.5](https://huggingface.co/BAAI/bge-base-zh-v1.5) | 768 |  63.13 | 69.49 | 53.72 | 79.75 | 68.07 | 65.39 | 47.53 |
+| [BAAI/bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5) | 512 | 57.82 | 61.77 | 49.11 | 70.41 | 63.96 | 60.92 | 44.18 |
 | [BAAI/bge-large-zh](https://huggingface.co/BAAI/bge-large-zh) | 1024 | 64.20 | 71.53 | 54.98 | 78.94 | 68.32 | 65.11 | 48.39 |
 | [bge-large-zh-noinstruct](https://huggingface.co/BAAI/bge-large-zh-noinstruct) | 1024 | 63.53 | 70.55 | 53 | 76.77 | 68.58 | 64.91 | 50.01 |
 | [BAAI/bge-base-zh](https://huggingface.co/BAAI/bge-base-zh) | 768 | 62.96 | 69.53 | 54.12 | 77.5 | 67.07 | 64.91 | 47.63 |
@@ -350,26 +470,26 @@ Please refer to [C_MTEB](https://github.com/FlagOpen/FlagEmbedding/blob/master/C
 - **Reranking**:
 See [C_MTEB](https://github.com/FlagOpen/FlagEmbedding/blob/master/C_MTEB/) for evaluation script.
 
-| Model | T2Reranking | T2RerankingZh2En\* | T2RerankingEn2Zh\* | MMarcoReranking | CMedQAv1 | CMedQAv2 | Avg |  
-|:-------------------------------|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|  
-| text2vec-base-multilingual | 64.66 | 62.94 | 62.51 | 14.37 | 48.46 | 48.6 | 50.26 |  
-| multilingual-e5-small | 65.62 | 60.94 | 56.41 | 29.91 | 67.26 | 66.54 | 57.78 |  
-| multilingual-e5-large | 64.55 | 61.61 | 54.28 | 28.6 | 67.42 | 67.92 | 57.4 |  
-| multilingual-e5-base | 64.21 | 62.13 | 54.68 | 29.5 | 66.23 | 66.98 | 57.29 |  
-| m3e-base | 66.03 | 62.74 | 56.07 | 17.51 | 77.05 | 76.76 | 59.36 |  
-| m3e-large | 66.13 | 62.72 | 56.1 | 16.46 | 77.76 | 78.27 | 59.57 |  
-| bge-base-zh-v1.5 | 66.49 | 63.25 | 57.02 | 29.74 | 80.47 | 84.88 | 63.64 |  
-| bge-large-zh-v1.5 | 65.74 | 63.39 | 57.03 | 28.74 | 83.45 | 85.44 | 63.97 |  
-| [BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base) | 67.28 | 63.95 | 60.45 | 35.46 | 81.26 | 84.1 | 65.42 |  
-| [BAAI/bge-reranker-large](https://huggingface.co/BAAI/bge-reranker-large) | 67.6 | 64.03 | 61.44 | 37.16 | 82.15 | 84.18 | 66.09 |  
+| Model | T2Reranking | T2RerankingZh2En\* | T2RerankingEn2Zh\* | MMarcoReranking | CMedQAv1 | CMedQAv2 | Avg |
+|:-------------------------------|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
+| text2vec-base-multilingual | 64.66 | 62.94 | 62.51 | 14.37 | 48.46 | 48.6 | 50.26 |
+| multilingual-e5-small | 65.62 | 60.94 | 56.41 | 29.91 | 67.26 | 66.54 | 57.78 |
+| multilingual-e5-large | 64.55 | 61.61 | 54.28 | 28.6 | 67.42 | 67.92 | 57.4 |
+| multilingual-e5-base | 64.21 | 62.13 | 54.68 | 29.5 | 66.23 | 66.98 | 57.29 |
+| m3e-base | 66.03 | 62.74 | 56.07 | 17.51 | 77.05 | 76.76 | 59.36 |
+| m3e-large | 66.13 | 62.72 | 56.1 | 16.46 | 77.76 | 78.27 | 59.57 |
+| bge-base-zh-v1.5 | 66.49 | 63.25 | 57.02 | 29.74 | 80.47 | 84.88 | 63.64 |
+| bge-large-zh-v1.5 | 65.74 | 63.39 | 57.03 | 28.74 | 83.45 | 85.44 | 63.97 |
+| [BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base) | 67.28 | 63.95 | 60.45 | 35.46 | 81.26 | 84.1 | 65.42 |
+| [BAAI/bge-reranker-large](https://huggingface.co/BAAI/bge-reranker-large) | 67.6 | 64.03 | 61.44 | 37.16 | 82.15 | 84.18 | 66.09 |
 
 \* : T2RerankingZh2En and T2RerankingEn2Zh are cross-language retrieval tasks
 
 ## Train
 
-### BAAI Embedding 
+### BAAI Embedding
 
-We pre-train the models using [retromae](https://github.com/staoxiao/RetroMAE) and train them on large-scale pairs data using contrastive learning. 
+We pre-train the models using [retromae](https://github.com/staoxiao/RetroMAE) and train them on large-scale pairs data using contrastive learning.
 **You can fine-tune the embedding model on your data following our [examples](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/finetune).**
 We also provide a [pre-train example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/pretrain).
 Note that the goal of pre-training is to reconstruct the text, and the pre-trained model cannot be used for similarity calculation directly, it needs to be fine-tuned.
@@ -379,17 +499,13 @@ More training details for bge see [baai_general_embedding](https://github.com/Fl
 
 ### BGE Reranker
 
-Cross-encoder will perform full-attention over the input pair, 
+Cross-encoder will perform full-attention over the input pair,
 which is more accurate than embedding model (i.e., bi-encoder) but more time-consuming than embedding model.
 Therefore, it can be used to re-rank the top-k documents returned by embedding model.
-We train the cross-encoder on a multilingual pair data, 
-The data format is the same as embedding model, so you can fine-tune it easily following our [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/reranker). 
+We train the cross-encoder on a multilingual pair data,
+The data format is the same as embedding model, so you can fine-tune it easily following our [example](https://github.com/FlagOpen/FlagEmbedding/tree/master/examples/reranker).
 More details please refer to [./FlagEmbedding/reranker/README.md](https://github.com/FlagOpen/FlagEmbedding/tree/master/FlagEmbedding/reranker)
 
-
-## Contact
-If you have any question or suggestion related to this project, feel free to open an issue or pull request.
-You also can email Shitao Xiao(stxiao@baai.ac.cn) and Zheng Liu(liuzheng@baai.ac.cn). 
 
 
 ## Citation
@@ -398,7 +514,7 @@ If you find this repository useful, please consider giving a star :star: and cit
 
 ```
 @misc{bge_embedding,
-      title={C-Pack: Packaged Resources To Advance General Chinese Embedding}, 
+      title={C-Pack: Packaged Resources To Advance General Chinese Embedding},
       author={Shitao Xiao and Zheng Liu and Peitian Zhang and Niklas Muennighoff},
       year={2023},
       eprint={2309.07597},
@@ -409,4 +525,3 @@ If you find this repository useful, please consider giving a star :star: and cit
 
 ## License
 FlagEmbedding is licensed under the [MIT License](https://github.com/FlagOpen/FlagEmbedding/blob/master/LICENSE). The released models can be used for commercial purposes free of charge.
-
